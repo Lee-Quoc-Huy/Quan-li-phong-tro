@@ -1,0 +1,6 @@
+{
+  "name": "Hệ thống Quản lý Phòng trọ",
+  "description": "Hệ thống quản lý nhà trọ thông minh, tự động hóa hóa đơn, an ninh từ xa và chỉ số điện nước thời gian thực cho Chủ trọ, Người thuê và Quản trị viên.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
