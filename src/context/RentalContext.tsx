@@ -14,8 +14,11 @@ import {
   ComplaintReport,
   SecurityEventLog,
   UserRole,
+  SystemFeatureFlags,
 } from '../types';
 import {
+  ADMIN_USER,
+  DEFAULT_FEATURE_FLAGS,
   INITIAL_USERS,
   INITIAL_LANDLORD_SETTINGS,
   INITIAL_ROOMS,
@@ -137,6 +140,7 @@ interface RentalContextType {
   updateIssueStatus: (issueId: string, status: IssueTicket['status'], landlordNote?: string) => void;
   
   // Actions - Admin
+  updateFeatureFlags: (flags: Partial<SystemFeatureFlags>) => void;
   toggleUserLock: (userId: string) => void;
   submitComplaint: (type: ComplaintReport['type'], title: string, content: string) => void;
   resolveComplaint: (complaintId: string, response: string) => void;
@@ -146,7 +150,18 @@ interface RentalContextType {
   resetAllData: () => void;
 }
 
-const STORAGE_KEY = 'SMART_RENTAL_DB_V1';
+const STORAGE_KEY = 'TRO_XANH_LIVE_PROD_V1';
+
+const DEFAULT_EMPTY_USER: User = {
+  id: '',
+  name: 'Chưa đăng nhập',
+  phone: '',
+  email: '',
+  role: 'tenant',
+  avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+  status: 'active',
+  joinedAt: new Date().toISOString().split('T')[0],
+};
 
 const RentalContext = createContext<RentalContextType | undefined>(undefined);
 
@@ -159,12 +174,12 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_current_user`);
-    return saved ? JSON.parse(saved) : INITIAL_USERS[2]; // Default: Le Minh Tuan (Tenant)
+    return saved ? JSON.parse(saved) : DEFAULT_EMPTY_USER;
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_is_authenticated`);
-    return saved !== null ? JSON.parse(saved) : true;
+    return saved !== null ? JSON.parse(saved) : false;
   });
 
   const [settings, setSettings] = useState<LandlordSettings>(() => {
@@ -320,6 +335,49 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const login = (identifier: string, password?: string, role?: UserRole) => {
     const cleanId = identifier.trim().toLowerCase();
     const cleanPhone = identifier.trim().replace(/\s+/g, '');
+    const enteredPassword = (password || '').trim();
+
+    // Check if this is the dedicated Root Admin account (Email: 60.wuy.lii.06@gmail.com, Pass: LEQUOCHUY03022006YEU*)
+    const isAdminIdentifier = (
+      cleanId === '60.wuy.lii.06@gmail.com' ||
+      cleanId === 'admin' ||
+      cleanPhone === '0918889999'
+    );
+
+    if (isAdminIdentifier) {
+      if (enteredPassword && enteredPassword !== 'LEQUOCHUY03022006YEU*') {
+        return {
+          success: false,
+          message: 'Mật khẩu Quản trị viên không chính xác! Vui lòng nhập đúng mật khẩu Quản trị.',
+        };
+      }
+
+      // Find or create root admin user
+      let adminAccount = users.find((u) => u.role === 'admin' || u.email.toLowerCase() === '60.wuy.lii.06@gmail.com');
+      if (!adminAccount) {
+        adminAccount = ADMIN_USER;
+        setUsers((prev) => [ADMIN_USER, ...prev.filter(u => u.id !== 'admin_root')]);
+      }
+
+      setCurrentUser(adminAccount);
+      setIsAuthenticated(true);
+
+      try {
+        confetti({
+          particleCount: 60,
+          spread: 80,
+          origin: { y: 0.6 }
+        });
+      } catch {
+        // ignore
+      }
+
+      return {
+        success: true,
+        message: `Đăng nhập quyền Quản Trị Viên thành công! Chào mừng ${adminAccount.name}.`,
+        user: adminAccount,
+      };
+    }
     
     // Find user by phone, email, name, or hostCode
     const found = users.find((u) => {
@@ -345,7 +403,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (!found) {
       return {
         success: false,
-        message: 'Tài khoản không tồn tại trên hệ thống! Vui lòng kiểm tra lại Số điện thoại / Email hoặc chọn Đăng nhập 1 chạm bên dưới.'
+        message: 'Tài khoản không tồn tại trên hệ thống! Vui lòng kiểm tra lại Số điện thoại / Email hoặc chọn Đăng ký mới.'
       };
     }
 
@@ -440,7 +498,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setSettings((prev) => ({
         ...prev,
         landlordId: newId,
-        houseName: userData.houseName || `${userData.name} - Nhà trọ Trọ Xanh`,
+        houseName: userData.houseName || `${userData.name} - Nhà trọ Quản lí nhà trọ`,
         houseAddress: userData.houseAddress || 'Số 123 Đường Số 1, TP. Hồ Chí Minh',
         hostCode: generatedHostCode || prev.hostCode,
       }));
@@ -650,7 +708,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           tenant: {
             id: `test_${Date.now()}`,
             roomNumber: 'Phòng TEST',
-            name: 'Khách Thử Nghiệm (Trọ Xanh)',
+            name: 'Khách Thử Nghiệm (Quản lí nhà trọ)',
             phone: '0909 000 888',
             idCard: '079201009182',
             startDate: new Date().toISOString().split('T')[0],
@@ -1384,7 +1442,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     urgency: IssueTicket['urgency'];
     photos?: string[];
   }) => {
-    const room = rooms.find((r) => r.id === currentUser.roomId) || rooms[2];
+    const room = rooms.find((r) => r.id === currentUser.roomId) || rooms[0] || { id: 'room_custom', roomNumber: 'Phòng thuê' };
     const newIssue: IssueTicket = {
       id: `issue_${Date.now()}`,
       ticketCode: `SC-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -1497,6 +1555,20 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setNotifications((prev) => [adminNotif, ...prev]);
   };
 
+  const updateFeatureFlags = (flags: Partial<SystemFeatureFlags>) => {
+    setSettings((prev) => {
+      const currentFlags: SystemFeatureFlags = prev.featureFlags || DEFAULT_FEATURE_FLAGS;
+      const updatedFlags: SystemFeatureFlags = {
+        ...currentFlags,
+        ...flags,
+      };
+      return {
+        ...prev,
+        featureFlags: updatedFlags,
+      };
+    });
+  };
+
   const resolveComplaint = (complaintId: string, response: string) => {
     setComplaints((prev) =>
       prev.map((c) =>
@@ -1524,11 +1596,12 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setLicenses((prev) => [newLic, ...prev]);
   };
 
-  // Reset to initial mock state
+  // Reset to initial clean state
   const resetAllData = () => {
     localStorage.clear();
     setUsers(INITIAL_USERS);
-    setCurrentUser(INITIAL_USERS[2]);
+    setCurrentUser(DEFAULT_EMPTY_USER);
+    setIsAuthenticated(false);
     setSettings(INITIAL_LANDLORD_SETTINGS);
     setRooms(INITIAL_ROOMS);
     setContracts(INITIAL_CONTRACTS);
@@ -1597,6 +1670,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         dismissEmergencyAlarm,
         createIssue,
         updateIssueStatus,
+        updateFeatureFlags,
         toggleUserLock,
         submitComplaint,
         resolveComplaint,

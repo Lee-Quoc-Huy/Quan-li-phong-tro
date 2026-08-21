@@ -36,18 +36,33 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onNavigateTab 
 
   const [selectedInvoiceForPay, setSelectedInvoiceForPay] = useState<Invoice | null>(null);
 
-  // Find tenant's current room
-  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms.find((r) => r.currentTenantId === currentUser.id) || rooms[2];
+  // Find tenant's current room safely
+  const defaultUnassignedRoom = {
+    id: 'room_unassigned',
+    roomNumber: 'Chưa vào phòng',
+    floor: 1,
+    areaM2: 0,
+    basePrice: 0,
+    amenities: [],
+    status: 'available' as const,
+    doorLockState: 'locked' as const,
+    doorPasscode: '---',
+    securityStatus: 'secure' as const,
+    electricityMeterStart: 0,
+    waterMeterStart: 0,
+  };
+
+  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms.find((r) => r.currentTenantId === currentUser.id) || rooms[0] || defaultUnassignedRoom;
   const myContract = contracts.find((c) => c.roomId === myRoom.id && c.status === 'active');
   const myTelemetry = telemetry[myRoom.id] || {
     roomId: myRoom.id,
-    currentKwh: 3968.4,
-    currentWaterM3: 219.2,
-    voltage: 221.8,
-    currentAmps: 5.4,
-    powerWatts: 1197.7,
+    currentKwh: 0,
+    currentWaterM3: 0,
+    voltage: 220,
+    currentAmps: 0,
+    powerWatts: 0,
     waterFlowRateLpm: 0.0,
-    lastTelemetryPing: 'Vừa xong',
+    lastTelemetryPing: 'Chưa có dữ liệu',
     dailyKwhTrend: [],
     dailyWaterTrend: [],
   };

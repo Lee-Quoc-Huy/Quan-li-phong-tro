@@ -13,7 +13,22 @@ import {
 
 export const TenantSecurity: React.FC = () => {
   const { currentUser, rooms, toggleRoomDoor, changeRoomDoorPIN, securityLogs, settings } = useRental();
-  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms.find((r) => r.currentTenantId === currentUser.id) || rooms[2];
+  const defaultUnassignedRoom = {
+    id: 'room_unassigned',
+    roomNumber: 'Chưa vào phòng',
+    floor: 1,
+    areaM2: 0,
+    basePrice: 0,
+    amenities: [],
+    status: 'available' as const,
+    doorLockState: 'locked' as const,
+    doorPasscode: '---',
+    securityStatus: 'secure' as const,
+    electricityMeterStart: 0,
+    waterMeterStart: 0,
+  };
+
+  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms.find((r) => r.currentTenantId === currentUser.id) || rooms[0] || defaultUnassignedRoom;
 
   const [newPIN, setNewPIN] = useState('');
   const [confirmPIN, setConfirmPIN] = useState('');

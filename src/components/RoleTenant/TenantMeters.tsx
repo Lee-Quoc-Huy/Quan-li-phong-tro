@@ -9,32 +9,33 @@ import { AIInsightCard } from '../Common/AIInsightCard';
 export const TenantMeters: React.FC = () => {
   const { currentUser, rooms, telemetry, settings } = useRental();
 
-  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms.find((r) => r.currentTenantId === currentUser.id) || rooms[2];
+  const defaultUnassignedRoom = {
+    id: 'room_unassigned',
+    roomNumber: 'Chưa vào phòng',
+    floor: 1,
+    areaM2: 0,
+    basePrice: 0,
+    amenities: [],
+    status: 'available' as const,
+    doorLockState: 'locked' as const,
+    doorPasscode: '---',
+    securityStatus: 'secure' as const,
+    electricityMeterStart: 0,
+    waterMeterStart: 0,
+  };
+
+  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms.find((r) => r.currentTenantId === currentUser.id) || rooms[0] || defaultUnassignedRoom;
   const tel = telemetry[myRoom.id] || {
     roomId: myRoom.id,
-    currentKwh: 3968.4,
-    currentWaterM3: 219.2,
-    voltage: 221.8,
-    currentAmps: 5.4,
-    powerWatts: 1197.7,
+    currentKwh: 0,
+    currentWaterM3: 0,
+    voltage: 220,
+    currentAmps: 0,
+    powerWatts: 0,
     waterFlowRateLpm: 0.0,
-    lastTelemetryPing: 'Vừa xong',
-    dailyKwhTrend: [
-      { hour: '00:00', kwh: 0.8 },
-      { hour: '04:00', kwh: 0.6 },
-      { hour: '08:00', kwh: 1.4 },
-      { hour: '12:00', kwh: 2.1 },
-      { hour: '16:00', kwh: 1.8 },
-      { hour: '20:00', kwh: 3.2 },
-    ],
-    dailyWaterTrend: [
-      { hour: '00:00', liters: 5 },
-      { hour: '04:00', liters: 0 },
-      { hour: '08:00', liters: 45 },
-      { hour: '12:00', liters: 20 },
-      { hour: '16:00', liters: 15 },
-      { hour: '20:00', liters: 60 },
-    ],
+    lastTelemetryPing: 'Chưa có dữ liệu',
+    dailyKwhTrend: [],
+    dailyWaterTrend: [],
   };
 
   const usedKwh = Math.max(0, tel.currentKwh - myRoom.electricityMeterStart);

@@ -18,7 +18,22 @@ export const TenantInvoices: React.FC = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'paid'>('all');
 
-  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms.find((r) => r.currentTenantId === currentUser.id) || rooms[2];
+  const defaultUnassignedRoom = {
+    id: 'room_unassigned',
+    roomNumber: 'Chưa vào phòng',
+    floor: 1,
+    areaM2: 0,
+    basePrice: 0,
+    amenities: [],
+    status: 'available' as const,
+    doorLockState: 'locked' as const,
+    doorPasscode: '---',
+    securityStatus: 'secure' as const,
+    electricityMeterStart: 0,
+    waterMeterStart: 0,
+  };
+
+  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms.find((r) => r.currentTenantId === currentUser.id) || rooms[0] || defaultUnassignedRoom;
   const myContract = contracts.find((c) => c.roomId === myRoom.id && c.status === 'active');
   
   const myInvoices = invoices.filter((i) => i.roomId === myRoom.id || i.tenantId === currentUser.id);

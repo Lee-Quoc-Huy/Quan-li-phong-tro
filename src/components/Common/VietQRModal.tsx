@@ -58,7 +58,7 @@ export const VietQRModal: React.FC<VietQRModalProps> = ({ invoice, onClose, mode
   };
 
   const handleCopyFullMessage = () => {
-    const msg = `[TRỌ XANH - THÔNG BÁO TIỀN PHÒNG]
+    const msg = `[QUẢN LÍ NHÀ TRỌ - THÔNG BÁO TIỀN PHÒNG]
 Kính gửi bạn ${invoice.tenantName} (${invoice.roomNumber}),
 Chi tiết hóa đơn kỳ ${invoice.monthYear}:
 - Tiền phòng: ${invoice.isRentPrepaid ? '0 đ (Đã trả trước)' : `${invoice.rentAmount.toLocaleString('vi-VN')} đ`}

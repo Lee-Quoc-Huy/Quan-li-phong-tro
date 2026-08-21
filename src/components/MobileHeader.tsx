@@ -30,7 +30,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
           </div>
           <div>
             <div className="font-bold text-slate-900 text-sm leading-tight">
-              Trọ Xanh
+              Quản lí nhà trọ
             </div>
             <div className="text-[10px] text-slate-500 font-medium truncate max-w-[140px]">
               {settings.houseName}

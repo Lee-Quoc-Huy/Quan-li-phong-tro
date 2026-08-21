@@ -10,8 +10,48 @@ import {
 export const TenantContract: React.FC = () => {
   const { currentUser, rooms, contracts, settings } = useRental();
 
-  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms.find((r) => r.currentTenantId === currentUser.id) || rooms[2];
+  const defaultUnassignedRoom = {
+    id: 'room_unassigned',
+    roomNumber: 'Chưa vào phòng',
+    floor: 1,
+    areaM2: 0,
+    basePrice: 0,
+    amenities: [],
+    status: 'available' as const,
+    doorLockState: 'locked' as const,
+    doorPasscode: '---',
+    securityStatus: 'secure' as const,
+    electricityMeterStart: 0,
+    waterMeterStart: 0,
+  };
+
+  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms.find((r) => r.currentTenantId === currentUser.id) || rooms[0] || defaultUnassignedRoom;
   const contract = contracts.find((c) => c.roomId === myRoom.id && c.status === 'active') || contracts[0];
+
+  if (!contract) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Hợp Đồng Điện Tử
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Thông tin hợp đồng thuê phòng số hóa giữa bạn và chủ nhà
+          </p>
+        </div>
+
+        <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+            <FileCheck className="w-6 h-6" />
+          </div>
+          <div className="text-sm font-bold text-slate-800">Chưa có hợp đồng nào được ký</div>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            Khi chủ nhà lập hợp đồng thuê phòng cho bạn, toàn bộ điều khoản và chữ ký số sẽ hiển thị tại đây.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -110,7 +150,7 @@ export const TenantContract: React.FC = () => {
 
         {/* Signature note */}
         <div className="pt-4 border-t border-slate-100 text-center text-xs text-slate-400">
-          Hợp đồng này được khởi tạo và lưu trữ trên hệ thống số hóa Trọ Xanh.
+          Hợp đồng này được khởi tạo và lưu trữ trên hệ thống số hóa Quản lí nhà trọ.
         </div>
 
       </div>

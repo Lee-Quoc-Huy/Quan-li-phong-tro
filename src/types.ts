@@ -147,12 +147,28 @@ export interface AppNotification {
   actionUrl?: string;
 }
 
+export interface SystemFeatureFlags {
+  enableSmartDoorLock: boolean;       // Khóa cửa phòng thông minh IoT
+  enableAutoGate: boolean;            // Cổng chính thông minh & tự động
+  enableIoTMeters: boolean;           // Đồng hồ điện nước thời gian thực & cảnh báo
+  enableAutoBilling: boolean;         // Tự động tính toán & lập hóa đơn AI
+  enableVietQR: boolean;              // Thanh toán quét mã VietQR Napas
+  enableDigitalContracts: boolean;    // Hợp đồng thuê điện tử & chữ ký số
+  enableIssueTickets: boolean;        // Báo hỏng & Phiếu sự cố kỹ thuật
+  enableGoogleSheetSync: boolean;     // Đồng bộ Google Sheet & Webhook Apps Script
+  enableComplaints: boolean;          // Khiếu nại, phản ánh vi phạm & tiếng ồn
+  enableEmergencyAlarm: boolean;      // Báo động an ninh khẩn cấp
+}
+
 export interface LandlordSettings {
   landlordId: string;
   houseName: string;
   houseAddress: string;
   hostCode: string; // 10-char alphanumeric code (e.g., LUX89K209A)
   
+  // Feature flags controlled by Admin or customized for landlord
+  featureFlags?: SystemFeatureFlags;
+
   // Pricing configuration
   electricityRate: number; // VNĐ per kWh
   waterRate: number; // VNĐ per m3

@@ -122,7 +122,7 @@ const MainApp: React.FC = () => {
         <footer className="w-full border-t border-slate-200/80 bg-white py-4 px-6 text-center text-xs text-slate-400">
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
             <div>
-              <strong>Trọ Xanh</strong> • Hệ thống Quản lý dãy trọ thông minh & Khóa IoT
+              <strong>Quản lí nhà trọ</strong> • Hệ thống Quản lý dãy trọ thông minh & Khóa IoT
             </div>
             <div className="text-[11px] text-slate-400">
               Đồ án Môn học: Phân tích & Thiết kế Hệ thống

@@ -104,121 +104,142 @@ export const LandlordRooms: React.FC = () => {
         </button>
       </div>
 
-      {/* Room Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {rooms.map((room) => {
-          const tenant = users.find((u) => u.id === room.currentTenantId);
+      {/* Room Grid or Empty State */}
+      {rooms.length === 0 ? (
+        <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center mx-auto">
+            <Building className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-slate-800">Dãy trọ chưa có phòng nào</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              Bắt đầu thiết lập hệ thống quản lý bằng cách tạo phòng trọ đầu tiên của bạn (số phòng, giá thuê, trang thiết bị).
+            </p>
+          </div>
+          <button
+            onClick={openAddModal}
+            className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs inline-flex items-center gap-2 shadow-2xs transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Thêm phòng đầu tiên</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {rooms.map((room) => {
+            const tenant = users.find((u) => u.id === room.currentTenantId);
 
-          return (
-            <div
-              key={room.id}
-              className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs hover:border-slate-300 transition-all flex flex-col justify-between space-y-4"
-            >
-              <div>
-                {/* Card Top */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base font-bold text-slate-900">
-                      {room.roomNumber}
-                    </span>
-                    <span className="text-xs text-slate-400 font-medium">
-                      Tầng {room.floor} • {room.areaM2}m²
+            return (
+              <div
+                key={room.id}
+                className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs hover:border-slate-300 transition-all flex flex-col justify-between space-y-4"
+              >
+                <div>
+                  {/* Card Top */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-bold text-slate-900">
+                        {room.roomNumber}
+                      </span>
+                      <span className="text-xs text-slate-400 font-medium">
+                        Tầng {room.floor} • {room.areaM2}m²
+                      </span>
+                    </div>
+
+                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${
+                      room.status === 'occupied'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : room.status === 'available'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {room.status === 'occupied' ? 'Đang thuê' : room.status === 'available' ? 'Phòng trống' : 'Bảo trì'}
                     </span>
                   </div>
 
-                  <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${
-                    room.status === 'occupied'
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      : room.status === 'available'
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {room.status === 'occupied' ? 'Đang thuê' : room.status === 'available' ? 'Phòng trống' : 'Bảo trì'}
-                  </span>
+                  {/* Price & Tenant Info */}
+                  <div className="mt-3 py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500">Giá thuê:</span>
+                      <span className="font-bold text-slate-900 font-mono">
+                        {room.basePrice.toLocaleString('vi-VN')} đ/tháng
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500">Người thuê:</span>
+                      <span className="font-semibold text-slate-800">
+                        {tenant ? tenant.name : <em className="text-slate-400 font-normal">Chưa có người</em>}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Amenities pills */}
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {room.amenities.map((item, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Price & Tenant Info */}
-                <div className="mt-3 py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Giá thuê:</span>
-                    <span className="font-bold text-slate-900 font-mono">
-                      {room.basePrice.toLocaleString('vi-VN')} đ/tháng
-                    </span>
-                  </div>
+                {/* Card Footer: IoT Lock & Actions */}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                  {/* Lock remote control */}
+                  <button
+                    onClick={() => toggleRoomDoor(room.id)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      room.doorLockState === 'locked'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                        : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                    }`}
+                    title="Bấm để điều khiển khóa cửa từ xa"
+                  >
+                    {room.doorLockState === 'locked' ? (
+                      <>
+                        <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Đang khóa</span>
+                      </>
+                    ) : (
+                      <>
+                        <Unlock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Đang mở</span>
+                      </>
+                    )}
+                  </button>
 
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Người thuê:</span>
-                    <span className="font-semibold text-slate-800">
-                      {tenant ? tenant.name : <em className="text-slate-400 font-normal">Chưa có người</em>}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Amenities pills */}
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {room.amenities.map((item, idx) => (
-                    <span
-                      key={idx}
-                      className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium"
+                  {/* Edit & Delete buttons */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => openEditModal(room)}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+                      title="Chỉnh sửa thông tin phòng"
                     >
-                      {item}
-                    </span>
-                  ))}
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Bạn có chắc chắn muốn xóa ${room.roomNumber}?`)) {
+                          deleteRoom(room.id);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                      title="Xóa phòng"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
+
               </div>
-
-              {/* Card Footer: IoT Lock & Actions */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                {/* Lock remote control */}
-                <button
-                  onClick={() => toggleRoomDoor(room.id)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    room.doorLockState === 'locked'
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                      : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
-                  }`}
-                  title="Bấm để điều khiển khóa cửa từ xa"
-                >
-                  {room.doorLockState === 'locked' ? (
-                    <>
-                      <Lock className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Đang khóa</span>
-                    </>
-                  ) : (
-                    <>
-                      <Unlock className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Đang mở</span>
-                    </>
-                  )}
-                </button>
-
-                {/* Edit & Delete buttons */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => openEditModal(room)}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
-                    title="Chỉnh sửa thông tin phòng"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (window.confirm(`Bạn có chắc chắn muốn xóa ${room.roomNumber}?`)) {
-                        deleteRoom(room.id);
-                      }
-                    }}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                    title="Xóa phòng"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Add / Edit Modal */}
       {isModalOpen && (

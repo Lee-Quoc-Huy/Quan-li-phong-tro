@@ -44,7 +44,7 @@ export const Header: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 gap-4">
             
-            {/* Logo and Academic Project Title */}
+            {/* Logo and Project Title */}
             <div className="flex items-center gap-3 shrink-0">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-500 to-amber-300 p-0.5 shadow-lg shadow-amber-950/40">
                 <div className="w-full h-full bg-[#0b0f17] rounded-[10px] flex items-center justify-center text-amber-400">
@@ -54,10 +54,10 @@ export const Header: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-slate-100 text-base tracking-tight uppercase">
-                    Smart Rental System
+                    Hệ Thống Quản Lý Trọ
                   </span>
-                  <span className="hidden md:inline-flex text-[9px] font-mono uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">
-                    Phân Tích & Thiết Kế HT
+                  <span className="hidden md:inline-flex text-[9px] font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                    Trực Tuyến
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-400 font-medium">
@@ -171,7 +171,7 @@ export const Header: React.FC = () => {
 
                     {/* Quick Switch Profiles */}
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 py-1.5">
-                      Chuyển đổi tài khoản mẫu:
+                      Chuyển đổi tài khoản làm việc:
                     </div>
                     <div className="space-y-1">
                       {users.map((u) => (
@@ -201,11 +201,11 @@ export const Header: React.FC = () => {
                       ))}
                     </div>
 
-                    {/* Reset Demo Data Button */}
+                    {/* Reset Data Button */}
                     <div className="border-t border-slate-800 mt-2 pt-2">
                       <button
                         onClick={() => {
-                          if (window.confirm('Khôi phục toàn bộ dữ liệu mẫu ban đầu?')) {
+                          if (window.confirm('Khôi phục toàn bộ dữ liệu ban đầu? Dữ liệu bạn tạo sẽ được đặt lại.')) {
                             resetAllData();
                             setIsUserMenuOpen(false);
                           }
@@ -213,7 +213,7 @@ export const Header: React.FC = () => {
                         className="w-full flex items-center justify-center gap-2 p-2 rounded-xl text-xs text-rose-400 hover:bg-rose-950/40 transition-colors"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        Khôi phục dữ liệu mẫu
+                        Đặt lại dữ liệu ban đầu
                       </button>
                     </div>
 
