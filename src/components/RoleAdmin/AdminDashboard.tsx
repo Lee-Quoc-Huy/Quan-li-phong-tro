@@ -64,6 +64,8 @@ export const AdminDashboard: React.FC = () => {
 
   const landlords = users.filter((u) => u.role === 'landlord');
   const tenants = users.filter((u) => u.role === 'tenant');
+  const nonAdminCount = landlords.length + tenants.length;
+  const displayRooms = landlords.length === 0 ? [] : rooms.filter((r) => landlords.some((l) => l.id === r.landlordId));
   const totalVolume = invoices.reduce((acc, i) => acc + i.totalAmount, 0);
 
   // Selected landlord for feature flags tab
@@ -296,10 +298,10 @@ export const AdminDashboard: React.FC = () => {
           </div>
           <div>
             <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {rooms.length} phòng
+              {displayRooms.length} phòng
             </div>
             <div className="text-xs text-slate-500 mt-1 font-medium">
-              {rooms.filter(r => r.status === 'occupied').length} phòng đang có khách ở
+              {displayRooms.filter(r => r.status === 'occupied').length} phòng đang có khách ở
             </div>
           </div>
         </div>
@@ -310,7 +312,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
           <div>
             <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {users.length} tài khoản
+              {nonAdminCount} tài khoản
             </div>
             <div className="text-xs text-slate-500 mt-1 font-medium">
               {landlords.length} Chủ trọ • {tenants.length} Khách thuê
@@ -360,7 +362,7 @@ export const AdminDashboard: React.FC = () => {
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>Danh Sách Tài Khoản ({users.length})</span>
+          <span>Danh Sách Tài Khoản ({nonAdminCount})</span>
         </button>
 
         <button
@@ -568,7 +570,7 @@ export const AdminDashboard: React.FC = () => {
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="font-bold text-slate-900 text-sm">
-                Danh Sách Tài Khoản Hệ Thống ({users.length})
+                Danh Sách Tài Khoản Hệ Thống ({nonAdminCount})
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
                 Tài khoản được phân nhóm theo từng Chủ Trọ và danh sách Khách Thuê trực thuộc

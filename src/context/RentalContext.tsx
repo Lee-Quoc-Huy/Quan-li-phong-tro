@@ -1934,6 +1934,16 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (userId === 'admin_root') return;
     deleteUserFromFirestore(userId);
     setUsers((prev) => prev.filter((u) => u.id !== userId));
+
+    // Delete rooms that belonged to deleted landlord, or remove tenant from room
+    setRooms((prev) => {
+      const remaining = prev.filter((r) => r.landlordId !== userId);
+      return remaining.map((r) =>
+        r.currentTenantId === userId
+          ? { ...r, currentTenantId: undefined, currentTenantName: undefined, status: 'available' }
+          : r
+      );
+    });
   };
 
   const deleteAllNonAdminUsers = () => {
@@ -1943,25 +1953,40 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
     });
 
+    rooms.forEach((r) => {
+      deleteDoc(doc(db, 'rooms', r.id)).catch(() => {});
+    });
+
     joinRequests.forEach((j) => {
       deleteDoc(doc(db, 'joinRequests', j.id)).catch(() => {});
     });
 
-    setRooms((prev) =>
-      prev.map((r) => ({
-        ...r,
-        currentTenantId: undefined,
-        status: 'available',
-      }))
-    );
+    contracts.forEach((c) => {
+      deleteDoc(doc(db, 'contracts', c.id)).catch(() => {});
+    });
+
+    invoices.forEach((inv) => {
+      deleteDoc(doc(db, 'invoices', inv.id)).catch(() => {});
+    });
 
     const adminOnlyUsers = users.filter((u) => u.role === 'admin' || u.id === 'admin_root');
     const finalUsers = adminOnlyUsers.length > 0 ? adminOnlyUsers : [ADMIN_USER];
 
     setUsers(finalUsers);
+    setRooms([]);
+    setContracts([]);
+    setInvoices([]);
+    setIssues([]);
     setJoinRequests([]);
+    setNotifications([]);
+
     localStorage.setItem(`${STORAGE_KEY}_users`, JSON.stringify(finalUsers));
+    localStorage.setItem(`${STORAGE_KEY}_rooms`, JSON.stringify([]));
+    localStorage.setItem(`${STORAGE_KEY}_contracts`, JSON.stringify([]));
+    localStorage.setItem(`${STORAGE_KEY}_invoices`, JSON.stringify([]));
+    localStorage.setItem(`${STORAGE_KEY}_issues`, JSON.stringify([]));
     localStorage.setItem(`${STORAGE_KEY}_join_requests`, JSON.stringify([]));
+    localStorage.setItem(`${STORAGE_KEY}_notifications`, JSON.stringify([]));
   };
 
   const submitComplaint = (type: ComplaintReport['type'], title: string, content: string) => {
