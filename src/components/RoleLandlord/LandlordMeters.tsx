@@ -43,8 +43,17 @@ export const LandlordMeters: React.FC = () => {
       </div>
 
       {/* Grid of rooms telemetry */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {rooms.map((room) => {
+      {rooms.length === 0 ? (
+        <div className="p-12 text-center bg-white rounded-2xl border border-slate-200/80 shadow-2xs space-y-3 max-w-lg mx-auto">
+          <Activity className="w-10 h-10 text-amber-500 mx-auto" />
+          <h3 className="font-bold text-slate-800 text-base">Chưa có phòng nào trong hệ thống</h3>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Chủ trọ chưa tạo danh sách phòng. Vui lòng vào mục <strong>"Quản lý Phòng"</strong> để khởi tạo phòng trọ trước khi theo dõi đồng hồ điện nước.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {rooms.map((room) => {
           const tel = telemetry[room.id] || {
             roomId: room.id,
             currentKwh: 3500.0,
@@ -130,6 +139,7 @@ export const LandlordMeters: React.FC = () => {
           );
         })}
       </div>
+      )}
 
     </div>
   );

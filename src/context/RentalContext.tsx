@@ -800,7 +800,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       tenantEmail: tenant.email,
       hostCodeInput: cleanCode,
       landlordId: settings.landlordId,
-      roomIdRequested: requestedRoomId || 'room_101',
+      roomIdRequested: requestedRoomId || 'Chưa chọn phòng',
       status: 'pending',
       createdAt: new Date().toLocaleString('vi-VN'),
     };

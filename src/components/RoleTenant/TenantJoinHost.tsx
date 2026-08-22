@@ -13,7 +13,7 @@ import {
 export const TenantJoinHost: React.FC = () => {
   const { currentUser, settings, submitHostCode, joinRequests, rooms } = useRental();
   const [code, setCode] = useState('');
-  const [selectedRoom, setSelectedRoom] = useState('room_101');
+  const [selectedRoom, setSelectedRoom] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const myPendingRequest = joinRequests.find(
@@ -26,7 +26,7 @@ export const TenantJoinHost: React.FC = () => {
     e.preventDefault();
     if (!code.trim()) return;
 
-    const res = submitHostCode(code, currentUser.id, selectedRoom);
+    const res = submitHostCode(code, currentUser.id, selectedRoom || undefined);
     setFeedback({
       type: res.success ? 'success' : 'error',
       message: res.message,
@@ -121,6 +121,28 @@ export const TenantJoinHost: React.FC = () => {
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-sm uppercase outline-none focus:border-teal-500 focus:bg-white"
             />
           </div>
+
+          {availableRooms.length > 0 ? (
+            <div className="space-y-1">
+              <label className="text-slate-700 font-semibold block">Đăng ký phòng ở mong muốn (Tùy chọn):</label>
+              <select
+                value={selectedRoom}
+                onChange={(e) => setSelectedRoom(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm outline-none focus:border-teal-500 font-medium"
+              >
+                <option value="">-- Để Chủ trọ xếp phòng sau --</option>
+                {availableRooms.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.roomNumber} ({r.basePrice.toLocaleString('vi-VN')} đ/tháng)
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="text-[11px] text-slate-500 italic bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+              * Dãy trọ chưa công khai danh sách phòng trống. Bạn cứ gửi yêu cầu, chủ trọ sẽ xếp phòng khi duyệt.
+            </div>
+          )}
 
           <button
             type="submit"

@@ -326,13 +326,8 @@ export const LandlordTenants: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {pendingRequests.map((req) => {
-                // Ensure room options list is never empty
-                const roomList = rooms.length > 0 ? rooms : [
-                  { id: 'room_101', roomNumber: 'Phòng 101', floor: 1, status: 'available', basePrice: 2500000 },
-                  { id: 'room_102', roomNumber: 'Phòng 102', floor: 1, status: 'available', basePrice: 2500000 },
-                  { id: 'room_103', roomNumber: 'Phòng 103', floor: 1, status: 'available', basePrice: 2800000 },
-                  { id: 'room_201', roomNumber: 'Phòng 201', floor: 2, status: 'available', basePrice: 2600000 },
-                ];
+                // Room options list matches actual rooms
+                const roomList = rooms;
 
                 // Auto select first available room if default requested room is occupied or invalid
                 const firstAvailableRoom = roomList.find((r) => r.status === 'available');
@@ -349,7 +344,7 @@ export const LandlordTenants: React.FC = () => {
                 }
 
                 const currentChosenRoom = defaultRoomChoice;
-                const isCustomSelected = currentChosenRoom === 'custom';
+                const isCustomSelected = currentChosenRoom === 'custom' || roomList.length === 0;
 
                 // Real-time calculation: Check if chosen room is already occupied
                 let targetRoomObj = roomList.find((r) => r.id === currentChosenRoom || r.roomNumber === currentChosenRoom);
@@ -376,7 +371,12 @@ export const LandlordTenants: React.FC = () => {
 
                   let finalRoomTarget = currentChosenRoom;
                   if (isCustomSelected) {
-                    finalRoomTarget = customRoomInputs[req.id]?.trim() || 'Phòng 101';
+                    const typed = customRoomInputs[req.id]?.trim();
+                    if (!typed) {
+                      alert('Vui lòng nhập số phòng mới (VD: 101, 201...) để khởi tạo và bàn giao phòng cho khách!');
+                      return;
+                    }
+                    finalRoomTarget = typed;
                   }
                   approveJoinRequest(req.id, finalRoomTarget);
                   setFeedback({

@@ -34,7 +34,7 @@ export const LandlordInvoices: React.FC = () => {
 
   // Form State for manual invoice
   const [targetType, setTargetType] = useState<'single' | 'all'>('single');
-  const [selectedRoomId, setSelectedRoomId] = useState(rooms[0]?.id || 'room_101');
+  const [selectedRoomId, setSelectedRoomId] = useState(rooms[0]?.id || '');
   const [monthYear, setMonthYear] = useState('Tháng 08/2026');
   const [elecStart, setElecStart] = useState(3800);
   const [elecEnd, setElecEnd] = useState(3968);
@@ -54,8 +54,13 @@ export const LandlordInvoices: React.FC = () => {
     e.preventDefault();
 
     if (targetType === 'single') {
+      const targetRoom = selectedRoomId || rooms[0]?.id;
+      if (!targetRoom) {
+        alert('Chưa có phòng nào trong hệ thống! Vui lòng tạo phòng tại mục Quản lý phòng trọ trước khi tạo hóa đơn.');
+        return;
+      }
       createManualInvoice({
-        roomId: selectedRoomId,
+        roomId: targetRoom,
         monthYear,
         extraFee: Number(customExtraFee) || 0,
         extraFeeReason: customExtraFeeReason.trim(),
@@ -285,17 +290,23 @@ export const LandlordInvoices: React.FC = () => {
               {targetType === 'single' && (
                 <div className="space-y-1">
                   <label className="text-slate-700 font-semibold">Chọn phòng:</label>
-                  <select
-                    value={selectedRoomId}
-                    onChange={(e) => setSelectedRoomId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 outline-none"
-                  >
-                    {rooms.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.roomNumber} ({r.basePrice.toLocaleString('vi-VN')} đ/tháng)
-                      </option>
-                    ))}
-                  </select>
+                  {rooms.length === 0 ? (
+                    <div className="p-3 bg-amber-50 text-amber-800 rounded-xl text-xs font-medium border border-amber-200">
+                      ⚠️ Chưa có phòng nào trong hệ thống. Vui lòng tạo phòng tại mục Quản lý phòng trọ trước khi tạo hóa đơn.
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedRoomId || rooms[0]?.id}
+                      onChange={(e) => setSelectedRoomId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 outline-none font-semibold"
+                    >
+                      {rooms.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.roomNumber} ({r.basePrice.toLocaleString('vi-VN')} đ/tháng)
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
 
