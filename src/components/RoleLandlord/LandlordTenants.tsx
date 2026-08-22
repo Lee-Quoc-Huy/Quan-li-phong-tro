@@ -22,7 +22,8 @@ import {
   Printer,
   Calendar,
   DollarSign,
-  Plus
+  Plus,
+  Trash2
 } from 'lucide-react';
 
 export const LandlordTenants: React.FC = () => {
@@ -35,6 +36,7 @@ export const LandlordTenants: React.FC = () => {
     checkoutTenant, 
     contracts,
     updateContract,
+    deleteContract,
     createContractCustom,
     settings,
     currentUser,
@@ -256,11 +258,24 @@ export const LandlordTenants: React.FC = () => {
                               ...contract,
                               landlordName: contract.landlordName || defaultLandlordName
                             })}
-                            className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-semibold transition-colors flex items-center gap-1.5"
+                            className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-semibold transition-colors flex items-center gap-1.5 text-xs"
                             title="Chỉnh sửa thông tin chủ trọ / điều khoản hợp đồng"
                           >
                             <Edit3 className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Sửa Hợp Đồng</span>
+                            <span>Sửa HĐ</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Xác nhận xóa hợp đồng [${contract.contractCode}] của ${contract.tenantName}?`)) {
+                                deleteContract(contract.id);
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold transition-colors flex items-center gap-1.5 text-xs"
+                            title="Xóa / Hủy hợp đồng này"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Xóa HĐ</span>
                           </button>
                         </div>
                       ) : (
@@ -537,7 +552,7 @@ export const LandlordTenants: React.FC = () => {
                   <div className="flex items-center gap-2 pt-2 border-t border-slate-200/60">
                     <button
                       onClick={() => setViewContract(c)}
-                      className="flex-1 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-800 font-semibold flex items-center justify-center gap-1"
+                      className="flex-1 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-800 font-semibold text-xs flex items-center justify-center gap-1"
                     >
                       <Eye className="w-3.5 h-3.5 text-teal-600" /> Xem HĐ
                     </button>
@@ -546,9 +561,19 @@ export const LandlordTenants: React.FC = () => {
                         ...c,
                         landlordName: c.landlordName || defaultLandlordName
                       })}
-                      className="flex-1 py-1.5 rounded-lg bg-white hover:bg-amber-50 border border-slate-200 text-amber-800 font-semibold flex items-center justify-center gap-1"
+                      className="flex-1 py-1.5 rounded-lg bg-white hover:bg-amber-50 border border-slate-200 text-amber-800 font-semibold text-xs flex items-center justify-center gap-1"
                     >
-                      <Edit3 className="w-3.5 h-3.5 text-amber-600" /> Chỉnh sửa
+                      <Edit3 className="w-3.5 h-3.5 text-amber-600" /> Sửa HĐ
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Bạn có chắc chắn muốn xóa hợp đồng [${c.contractCode}] không?`)) {
+                          deleteContract(c.id);
+                        }
+                      }}
+                      className="flex-1 py-1.5 rounded-lg bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-300 text-rose-700 font-semibold text-xs flex items-center justify-center gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" /> Xóa HĐ
                     </button>
                   </div>
                 </div>

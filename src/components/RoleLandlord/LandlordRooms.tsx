@@ -223,7 +223,11 @@ export const LandlordRooms: React.FC = () => {
                     </button>
                     <button
                       onClick={() => {
-                        if (window.confirm(`Bạn có chắc chắn muốn xóa ${room.roomNumber}?`)) {
+                        const occupants = users.filter((u) => u.roomId === room.id);
+                        const confirmText = occupants.length > 0
+                          ? `Phòng ${room.roomNumber} đang có ${occupants.length} khách thuê (${occupants.map(o => o.name).join(', ')}). Bạn có chắc muốn xóa phòng này và giải phóng các khách thuê khỏi phòng không?`
+                          : `Bạn có chắc chắn muốn xóa ${room.roomNumber}?`;
+                        if (window.confirm(confirmText)) {
                           deleteRoom(room.id);
                         }
                       }}

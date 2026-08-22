@@ -10,7 +10,11 @@ import {
   CheckCircle2, 
   Camera,
   Save,
-  UserCog
+  UserCog,
+  KeyRound,
+  Copy,
+  Check,
+  RefreshCw
 } from 'lucide-react';
 
 const PRESET_AVATARS = [
@@ -23,7 +27,7 @@ const PRESET_AVATARS = [
 ];
 
 export const UserProfileSettings: React.FC = () => {
-  const { currentUser, updateUserProfile } = useRental();
+  const { currentUser, updateUserProfile, settings, regenerateHostCode } = useRental();
 
   const [name, setName] = useState(currentUser.name || '');
   const [email, setEmail] = useState(currentUser.email || '');
@@ -31,6 +35,22 @@ export const UserProfileSettings: React.FC = () => {
   const [age, setAge] = useState<number | ''>(currentUser.age ?? 25);
   const [avatar, setAvatar] = useState(currentUser.avatar || PRESET_AVATARS[0]);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [copiedHostCode, setCopiedHostCode] = useState(false);
+  const [hostCodeMsg, setHostCodeMsg] = useState<string | null>(null);
+
+  const handleCopyHostCode = () => {
+    navigator.clipboard.writeText(settings.hostCode);
+    setCopiedHostCode(true);
+    setTimeout(() => setCopiedHostCode(false), 2000);
+  };
+
+  const handleRandomizeHostCode = () => {
+    if (window.confirm('Tạo lại Mã Chủ Trọ ngẫu nhiên mới?\n\nMã cũ sẽ không thể dùng để kết nối nữa.')) {
+      const newCode = regenerateHostCode();
+      setHostCodeMsg(`Đã tạo mã mới: ${newCode}`);
+      setTimeout(() => setHostCodeMsg(null), 3000);
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -226,6 +246,51 @@ export const UserProfileSettings: React.FC = () => {
               />
             </div>
           </div>
+
+          {/* Landlord Host Code Section */}
+          {currentUser.role === 'landlord' && (
+            <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-amber-500 text-slate-950 font-bold">
+                    <KeyRound className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900">Mã Kết Nối Chủ Trọ (Host Code)</h4>
+                    <p className="text-[11px] text-slate-500">Khách thuê cần mã này để gửi yêu cầu tham gia dãy trọ.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-extrabold text-base text-amber-900 bg-amber-200/80 px-3 py-1.5 rounded-xl border border-amber-300">
+                    {settings.hostCode}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyHostCode}
+                    className="px-3 py-2 rounded-xl bg-amber-200/60 hover:bg-amber-300/80 text-amber-900 text-xs font-bold flex items-center gap-1.5 transition-all"
+                  >
+                    {copiedHostCode ? <Check className="w-4 h-4 text-emerald-700" /> : <Copy className="w-4 h-4" />}
+                    <span>{copiedHostCode ? 'Đã chép' : 'Sao chép'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRandomizeHostCode}
+                    className="px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Đổi Mã Mới</span>
+                  </button>
+                </div>
+              </div>
+
+              {hostCodeMsg && (
+                <p className="text-xs font-bold text-amber-800 bg-amber-100 p-2 rounded-xl border border-amber-300">
+                  {hostCodeMsg}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Submit Action */}
           <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">

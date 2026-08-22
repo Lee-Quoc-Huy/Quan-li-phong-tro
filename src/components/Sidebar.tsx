@@ -24,7 +24,8 @@ import {
   RotateCcw,
   Sparkles,
   Bell,
-  UserCog
+  UserCog,
+  RefreshCw
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -53,7 +54,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     issues, 
     invoices, 
     unreadNotifsCount,
-    resetAllData 
+    resetAllData,
+    regenerateHostCode
   } = useRental();
 
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
@@ -67,6 +69,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     navigator.clipboard.writeText(settings.hostCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const handleRandomizeHostCode = () => {
+    if (window.confirm('Tạo lại Mã Chủ Trọ ngẫu nhiên mới?\n\nMã cũ sẽ bị hủy. Khách thuê mới cần nhập mã mới để gửi yêu cầu tham gia.')) {
+      const newCode = regenerateHostCode();
+      alert(`Mã Chủ Trọ mới của bạn là: ${newCode}`);
+    }
   };
 
   interface SidebarLink {
@@ -169,13 +178,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-slate-500">Mã kết nối: </span>
               <span className="font-bold text-emerald-800 font-mono">{settings.hostCode}</span>
             </div>
-            <button
-              onClick={handleCopyHostCode}
-              title="Sao chép mã chủ trọ"
-              className="text-[10px] text-emerald-700 hover:text-emerald-900 font-medium px-2 py-0.5 rounded bg-emerald-100/70"
-            >
-              {copiedCode ? 'Đã chép' : 'Chép'}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleCopyHostCode}
+                title="Sao chép mã chủ trọ"
+                className="text-[10px] text-emerald-700 hover:text-emerald-900 font-medium px-2 py-0.5 rounded bg-emerald-100/70"
+              >
+                {copiedCode ? 'Đã chép' : 'Chép'}
+              </button>
+              <button
+                onClick={handleRandomizeHostCode}
+                title="Đổi/Tạo mã ngẫu nhiên mới"
+                className="text-[10px] text-emerald-700 hover:text-emerald-900 font-medium p-1 rounded bg-emerald-100/70"
+              >
+                <RefreshCw className="w-3 h-3" />
+              </button>
+            </div>
           </div>
         )}
 

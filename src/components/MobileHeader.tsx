@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useRental } from '../context/RentalContext';
 import { AppLogo } from './Common/AppLogo';
-import { Menu, Bell, User, LogOut, Copy, Check, ShieldAlert } from 'lucide-react';
+import { Menu, Bell, User, LogOut, Copy, Check, ShieldAlert, RefreshCw } from 'lucide-react';
 
 interface MobileHeaderProps {
   onToggleSidebar: () => void;
@@ -12,13 +12,20 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   onToggleSidebar,
   onOpenNotifications,
 }) => {
-  const { currentUser, settings, joinRequests, unreadNotifsCount, logout } = useRental();
+  const { currentUser, settings, joinRequests, unreadNotifsCount, logout, regenerateHostCode } = useRental();
   const [copiedCode, setCopiedCode] = useState(false);
 
   const handleCopyHostCode = () => {
     navigator.clipboard.writeText(settings.hostCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const handleRandomizeHostCode = () => {
+    if (window.confirm('Tạo lại Mã Chủ Trọ ngẫu nhiên mới?\n\nMã cũ sẽ ngừng hoạt động.')) {
+      const newCode = regenerateHostCode();
+      alert(`Đã tạo mã ngẫu nhiên mới: ${newCode}`);
+    }
   };
 
   return (
@@ -46,13 +53,22 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                 {currentUser.role === 'landlord' ? 'Chủ trọ' : currentUser.role === 'tenant' ? 'Khách thuê' : 'Admin'}
               </span>
               {currentUser.role === 'landlord' && (
-                <button
-                  onClick={handleCopyHostCode}
-                  className="text-teal-700 hover:text-teal-900 font-mono font-bold hover:underline flex items-center gap-0.5"
-                >
-                  <span>Mã: {settings.hostCode}</span>
-                  {copiedCode ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5" />}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handleCopyHostCode}
+                    className="text-teal-700 hover:text-teal-900 font-mono font-bold hover:underline flex items-center gap-0.5"
+                  >
+                    <span>Mã: {settings.hostCode}</span>
+                    {copiedCode ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5" />}
+                  </button>
+                  <button
+                    onClick={handleRandomizeHostCode}
+                    title="Đổi mã mới"
+                    className="p-1 rounded hover:bg-slate-100 text-teal-700"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
+                </div>
               )}
             </div>
           </div>

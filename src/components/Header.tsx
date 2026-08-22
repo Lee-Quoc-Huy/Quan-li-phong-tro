@@ -15,7 +15,8 @@ import {
   Check, 
   AlertTriangle,
   Sparkles,
-  UserCog
+  UserCog,
+  RefreshCw
 } from 'lucide-react';
 import { NotificationDrawer } from './Common/NotificationDrawer';
 import { UserProfileModal } from './Common/UserProfileModal';
@@ -29,18 +30,28 @@ export const Header: React.FC = () => {
     settings, 
     joinRequests,
     unreadNotifsCount,
-    resetAllData 
+    resetAllData,
+    regenerateHostCode
   } = useRental();
 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [codeMsg, setCodeMsg] = useState<string | null>(null);
 
   const handleCopyHostCode = () => {
     navigator.clipboard.writeText(settings.hostCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const handleRandomizeHostCode = () => {
+    if (window.confirm('Bạn có chắc muốn đổi/tạo lại Mã Chủ Trọ ngẫu nhiên mới không?\n\nMã cũ sẽ ngừng hoạt động. Khách thuê mới sẽ cần dùng mã mới này để kết nối.')) {
+      const newCode = regenerateHostCode();
+      setCodeMsg(`Đã tạo mã mới: ${newCode}`);
+      setTimeout(() => setCodeMsg(null), 3000);
+    }
   };
 
   return (
@@ -114,7 +125,7 @@ export const Header: React.FC = () => {
             <div className="flex items-center gap-3">
               
               {/* Host Code Display (Crucial for Landlord & Tenant connection) */}
-              <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 bg-slate-900/90 border border-amber-500/30 rounded-xl">
+              <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 bg-slate-900/90 border border-amber-500/30 rounded-xl relative">
                 <KeyRound className="w-3.5 h-3.5 text-amber-400" />
                 <div className="text-[11px]">
                   <span className="text-slate-400 mr-1">Mã Chủ Trọ:</span>
@@ -127,6 +138,20 @@ export const Header: React.FC = () => {
                 >
                   {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
+                {currentUser.role === 'landlord' && (
+                  <button
+                    onClick={handleRandomizeHostCode}
+                    title="Đổi/Tạo mã ngẫu nhiên mới (nếu mã cũ bị lộ)"
+                    className="p-1 hover:bg-slate-800 rounded text-amber-400 hover:text-amber-200 transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {codeMsg && (
+                  <div className="absolute top-full left-0 mt-1 px-2.5 py-1 bg-amber-500 text-slate-950 font-bold text-[10px] rounded-lg shadow-lg whitespace-nowrap animate-in fade-in z-50">
+                    {codeMsg}
+                  </div>
+                )}
               </div>
 
               {/* Notification Bell */}

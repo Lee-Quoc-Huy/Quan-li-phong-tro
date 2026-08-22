@@ -39,6 +39,7 @@ import {
   INITIAL_LICENSES,
   INITIAL_COMPLAINTS,
   INITIAL_SECURITY_LOGS,
+  generateRandomHostCode,
 } from '../mockData';
 
 interface RentalContextType {
@@ -158,6 +159,7 @@ interface RentalContextType {
   toggleUserLock: (userId: string) => void;
   deleteUser: (userId: string) => void;
   deleteAllNonAdminUsers: () => void;
+  regenerateHostCode: (landlordId?: string) => string;
   submitComplaint: (type: ComplaintReport['type'], title: string, content: string) => void;
   resolveComplaint: (complaintId: string, response: string) => void;
   issueLicense: (landlordId: string, plan: SystemLicense['plan'], maxRooms: number) => void;
@@ -381,7 +383,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const unsubRooms = onSnapshot(collection(db, 'rooms'), (snap) => {
       if (snap.empty) {
-        INITIAL_ROOMS.forEach((r) => setDoc(doc(db, 'rooms', r.id), sanitizeForFirestore(r)));
+        setRooms([]);
       } else {
         const fetched = snap.docs.map((d) => d.data() as Room);
         setRooms(fetched);
@@ -390,7 +392,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const unsubContracts = onSnapshot(collection(db, 'contracts'), (snap) => {
       if (snap.empty) {
-        INITIAL_CONTRACTS.forEach((c) => setDoc(doc(db, 'contracts', c.id), sanitizeForFirestore(c)));
+        setContracts([]);
       } else {
         const fetched = snap.docs.map((d) => d.data() as Contract);
         setContracts(fetched);
@@ -399,7 +401,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const unsubInvoices = onSnapshot(collection(db, 'invoices'), (snap) => {
       if (snap.empty) {
-        INITIAL_INVOICES.forEach((i) => setDoc(doc(db, 'invoices', i.id), sanitizeForFirestore(i)));
+        setInvoices([]);
       } else {
         const fetched = snap.docs.map((d) => d.data() as Invoice);
         setInvoices(fetched);
@@ -408,7 +410,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const unsubIssues = onSnapshot(collection(db, 'issues'), (snap) => {
       if (snap.empty) {
-        INITIAL_ISSUES.forEach((i) => setDoc(doc(db, 'issues', i.id), sanitizeForFirestore(i)));
+        setIssues([]);
       } else {
         const fetched = snap.docs.map((d) => d.data() as IssueTicket);
         setIssues(fetched);
@@ -417,7 +419,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const unsubNotifs = onSnapshot(collection(db, 'notifications'), (snap) => {
       if (snap.empty) {
-        INITIAL_NOTIFICATIONS.forEach((n) => setDoc(doc(db, 'notifications', n.id), sanitizeForFirestore(n)));
+        setNotifications([]);
       } else {
         const fetched = snap.docs.map((d) => d.data() as AppNotification);
         setNotifications(fetched);
@@ -426,7 +428,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const unsubJoinReqs = onSnapshot(collection(db, 'joinRequests'), (snap) => {
       if (snap.empty) {
-        INITIAL_JOIN_REQUESTS.forEach((j) => setDoc(doc(db, 'joinRequests', j.id), sanitizeForFirestore(j)));
+        setJoinRequests([]);
       } else {
         const fetched = snap.docs.map((d) => d.data() as JoinRequest);
         setJoinRequests(fetched);
@@ -435,7 +437,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const unsubLicenses = onSnapshot(collection(db, 'licenses'), (snap) => {
       if (snap.empty) {
-        INITIAL_LICENSES.forEach((l) => setDoc(doc(db, 'licenses', l.id), sanitizeForFirestore(l)));
+        setLicenses([]);
       } else {
         const fetched = snap.docs.map((d) => d.data() as SystemLicense);
         setLicenses(fetched);
@@ -444,7 +446,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const unsubComplaints = onSnapshot(collection(db, 'complaints'), (snap) => {
       if (snap.empty) {
-        INITIAL_COMPLAINTS.forEach((c) => setDoc(doc(db, 'complaints', c.id), sanitizeForFirestore(c)));
+        setComplaints([]);
       } else {
         const fetched = snap.docs.map((d) => d.data() as ComplaintReport);
         setComplaints(fetched);
@@ -453,7 +455,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const unsubLogs = onSnapshot(collection(db, 'securityLogs'), (snap) => {
       if (snap.empty) {
-        INITIAL_SECURITY_LOGS.forEach((s) => setDoc(doc(db, 'securityLogs', s.id), sanitizeForFirestore(s)));
+        setSecurityLogs([]);
       } else {
         const fetched = snap.docs.map((d) => d.data() as SecurityEventLog);
         setSecurityLogs(fetched);
@@ -1341,6 +1343,20 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const deleteRoom = (roomId: string) => {
     deleteRoomFromFirestore(roomId);
     setRooms((prev) => prev.filter((r) => r.id !== roomId));
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.roomId === roomId) {
+          const updatedUser = {
+            ...u,
+            roomId: undefined,
+            status: 'pending_approval' as const,
+          };
+          saveUserToFirestore(updatedUser);
+          return updatedUser;
+        }
+        return u;
+      })
+    );
   };
 
   // 5. Pricing Update & Automatic Broadcast
@@ -1989,6 +2005,33 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     localStorage.setItem(`${STORAGE_KEY}_notifications`, JSON.stringify([]));
   };
 
+  const regenerateHostCode = (targetLandlordId?: string) => {
+    const newCode = generateRandomHostCode();
+    const targetId = targetLandlordId || (currentUser.role === 'landlord' ? currentUser.id : settings.landlordId);
+
+    setSettings((prev) => {
+      const updated = { ...prev, hostCode: newCode };
+      saveSettingsToFirestore(updated);
+      return updated;
+    });
+
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id === targetId || (u.role === 'landlord' && (targetLandlordId ? u.id === targetLandlordId : u.id === currentUser.id))) {
+          const updatedUser = { ...u, hostCode: newCode };
+          saveUserToFirestore(updatedUser);
+          if (currentUser.id === u.id) {
+            setCurrentUser(updatedUser);
+          }
+          return updatedUser;
+        }
+        return u;
+      })
+    );
+
+    return newCode;
+  };
+
   const submitComplaint = (type: ComplaintReport['type'], title: string, content: string) => {
     const newComp: ComplaintReport = {
       id: `comp_${Date.now()}`,
@@ -2194,6 +2237,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         toggleUserLock,
         deleteUser,
         deleteAllNonAdminUsers,
+        regenerateHostCode,
         submitComplaint,
         resolveComplaint,
         issueLicense,
