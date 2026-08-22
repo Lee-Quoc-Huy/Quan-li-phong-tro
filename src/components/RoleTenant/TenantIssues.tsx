@@ -12,24 +12,48 @@ import {
 } from 'lucide-react';
 import { IssueTicket } from '../../types';
 
-export const TenantIssues: React.FC = () => {
-  const { currentUser, rooms, issues, createIssue } = useRental();
-  const defaultUnassignedRoom = {
-    id: 'room_unassigned',
-    roomNumber: 'Chưa vào phòng',
-    floor: 1,
-    areaM2: 0,
-    basePrice: 0,
-    amenities: [],
-    status: 'available' as const,
-    doorLockState: 'locked' as const,
-    doorPasscode: '---',
-    securityStatus: 'secure' as const,
-    electricityMeterStart: 0,
-    waterMeterStart: 0,
-  };
+interface TenantIssuesProps {
+  onNavigateTab: (tab: string) => void;
+}
 
-  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms.find((r) => r.currentTenantId === currentUser.id) || rooms[0] || defaultUnassignedRoom;
+export const TenantIssues: React.FC<TenantIssuesProps> = ({ onNavigateTab }) => {
+  const { currentUser, rooms, issues, createIssue } = useRental();
+
+  if (!currentUser.roomId) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Báo Sự Cố Hư Hỏng
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Gửi yêu cầu sửa chữa thiết bị điện nước, khóa cửa
+          </p>
+        </div>
+
+        <div className="p-8 bg-amber-50 border border-amber-200 rounded-2xl text-center space-y-4 max-w-xl mx-auto">
+          <div className="w-12 h-12 bg-amber-500 text-white rounded-2xl flex items-center justify-center mx-auto shadow-md">
+            <KeyRound className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="font-bold text-slate-900 text-base">Vui lòng nhập Mã chủ trọ và nhận phòng</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Bạn chưa có phòng được gán. Vui lòng vào mục <strong>"Nhập mã chủ trọ"</strong> để kết nối và báo cáo sự cố phòng.
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigateTab('join')}
+            className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold text-xs shadow-md transition-all inline-flex items-center gap-2"
+          >
+            <KeyRound className="w-4 h-4" />
+            <span>Đi đến trang Nhập Mã Chủ Trọ</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms[0];
 
   const [isCreating, setIsCreating] = useState(false);
   const [category, setCategory] = useState<IssueTicket['category']>('nuoc');

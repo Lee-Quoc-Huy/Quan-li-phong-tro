@@ -52,15 +52,15 @@ const MainApp: React.FC = () => {
     if (currentUser.role === 'tenant') {
       switch (activeTab) {
         case 'meters':
-          return <TenantMeters />;
+          return <TenantMeters onNavigateTab={setActiveTab} />;
         case 'invoices':
-          return <TenantInvoices />;
+          return <TenantInvoices onNavigateTab={setActiveTab} />;
         case 'contract':
-          return <TenantContract />;
+          return <TenantContract onNavigateTab={setActiveTab} />;
         case 'security':
-          return <TenantSecurity />;
+          return <TenantSecurity onNavigateTab={setActiveTab} />;
         case 'issues':
-          return <TenantIssues />;
+          return <TenantIssues onNavigateTab={setActiveTab} />;
         case 'join':
           return <TenantJoinHost />;
         case 'dashboard':
