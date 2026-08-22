@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import confetti from 'canvas-confetti';
 import {
+  collection,
+  doc,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
+} from 'firebase/firestore';
+import { db, sanitizeForFirestore } from '../lib/firebase';
+import {
   User,
   Room,
   Contract,
@@ -145,8 +153,10 @@ interface RentalContextType {
   updateIssueStatus: (issueId: string, status: IssueTicket['status'], landlordNote?: string) => void;
   
   // Actions - Admin
-  updateFeatureFlags: (flags: Partial<SystemFeatureFlags>) => void;
+  updateFeatureFlags: (flags: Partial<SystemFeatureFlags>, targetLandlordId?: string) => void;
+  getFeatureFlagsForLandlord: (landlordId?: string) => SystemFeatureFlags;
   toggleUserLock: (userId: string) => void;
+  deleteUser: (userId: string) => void;
   submitComplaint: (type: ComplaintReport['type'], title: string, content: string) => void;
   resolveComplaint: (complaintId: string, response: string) => void;
   issueLicense: (landlordId: string, plan: SystemLicense['plan'], maxRooms: number) => void;
@@ -307,6 +317,180 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     localStorage.setItem(`${STORAGE_KEY}_security_logs`, JSON.stringify(securityLogs));
   }, [securityLogs]);
 
+  // Firestore Persistence Sync Helpers
+  const saveUserToFirestore = async (user: User) => {
+    try { await setDoc(doc(db, 'users', user.id), sanitizeForFirestore(user), { merge: true }); } catch (err) { console.error('Firestore saveUser error:', err); }
+  };
+  const deleteUserFromFirestore = async (userId: string) => {
+    try { await deleteDoc(doc(db, 'users', userId)); } catch (err) { console.error('Firestore deleteUser error:', err); }
+  };
+  const saveRoomToFirestore = async (room: Room) => {
+    try { await setDoc(doc(db, 'rooms', room.id), sanitizeForFirestore(room), { merge: true }); } catch (err) { console.error('Firestore saveRoom error:', err); }
+  };
+  const deleteRoomFromFirestore = async (roomId: string) => {
+    try { await deleteDoc(doc(db, 'rooms', roomId)); } catch (err) { console.error('Firestore deleteRoom error:', err); }
+  };
+  const saveContractToFirestore = async (contract: Contract) => {
+    try { await setDoc(doc(db, 'contracts', contract.id), sanitizeForFirestore(contract), { merge: true }); } catch (err) { console.error('Firestore saveContract error:', err); }
+  };
+  const deleteContractFromFirestore = async (contractId: string) => {
+    try { await deleteDoc(doc(db, 'contracts', contractId)); } catch (err) { console.error('Firestore deleteContract error:', err); }
+  };
+  const saveInvoiceToFirestore = async (invoice: Invoice) => {
+    try { await setDoc(doc(db, 'invoices', invoice.id), sanitizeForFirestore(invoice), { merge: true }); } catch (err) { console.error('Firestore saveInvoice error:', err); }
+  };
+  const deleteInvoiceFromFirestore = async (invoiceId: string) => {
+    try { await deleteDoc(doc(db, 'invoices', invoiceId)); } catch (err) { console.error('Firestore deleteInvoice error:', err); }
+  };
+  const saveIssueToFirestore = async (issue: IssueTicket) => {
+    try { await setDoc(doc(db, 'issues', issue.id), sanitizeForFirestore(issue), { merge: true }); } catch (err) { console.error('Firestore saveIssue error:', err); }
+  };
+  const saveNotificationToFirestore = async (notif: AppNotification) => {
+    try { await setDoc(doc(db, 'notifications', notif.id), sanitizeForFirestore(notif), { merge: true }); } catch (err) { console.error('Firestore saveNotification error:', err); }
+  };
+  const saveJoinRequestToFirestore = async (req: JoinRequest) => {
+    try { await setDoc(doc(db, 'joinRequests', req.id), sanitizeForFirestore(req), { merge: true }); } catch (err) { console.error('Firestore saveJoinRequest error:', err); }
+  };
+  const saveSettingsToFirestore = async (st: LandlordSettings) => {
+    try { await setDoc(doc(db, 'settings', 'main'), sanitizeForFirestore(st), { merge: true }); } catch (err) { console.error('Firestore saveSettings error:', err); }
+  };
+  const saveTelemetryToFirestore = async (tel: Record<string, RealtimeTelemetry>) => {
+    try { await setDoc(doc(db, 'telemetry', 'main'), sanitizeForFirestore(tel), { merge: true }); } catch (err) { console.error('Firestore saveTelemetry error:', err); }
+  };
+  const saveComplaintToFirestore = async (comp: ComplaintReport) => {
+    try { await setDoc(doc(db, 'complaints', comp.id), sanitizeForFirestore(comp), { merge: true }); } catch (err) { console.error('Firestore saveComplaint error:', err); }
+  };
+  const saveLicenseToFirestore = async (license: SystemLicense) => {
+    try { await setDoc(doc(db, 'licenses', license.id), sanitizeForFirestore(license), { merge: true }); } catch (err) { console.error('Firestore saveLicense error:', err); }
+  };
+  const saveSecurityLogToFirestore = async (log: SecurityEventLog) => {
+    try { await setDoc(doc(db, 'securityLogs', log.id), sanitizeForFirestore(log), { merge: true }); } catch (err) { console.error('Firestore saveSecurityLog error:', err); }
+  };
+
+  // Subscribe to cloud Firestore collections on mount
+  useEffect(() => {
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+      if (snap.empty) {
+        INITIAL_USERS.forEach((u) => setDoc(doc(db, 'users', u.id), sanitizeForFirestore(u)));
+      } else {
+        const fetched = snap.docs.map((d) => d.data() as User);
+        setUsers(fetched);
+      }
+    }, (err) => console.error('Firestore users listener error:', err));
+
+    const unsubRooms = onSnapshot(collection(db, 'rooms'), (snap) => {
+      if (snap.empty) {
+        INITIAL_ROOMS.forEach((r) => setDoc(doc(db, 'rooms', r.id), sanitizeForFirestore(r)));
+      } else {
+        const fetched = snap.docs.map((d) => d.data() as Room);
+        setRooms(fetched);
+      }
+    }, (err) => console.error('Firestore rooms listener error:', err));
+
+    const unsubContracts = onSnapshot(collection(db, 'contracts'), (snap) => {
+      if (snap.empty) {
+        INITIAL_CONTRACTS.forEach((c) => setDoc(doc(db, 'contracts', c.id), sanitizeForFirestore(c)));
+      } else {
+        const fetched = snap.docs.map((d) => d.data() as Contract);
+        setContracts(fetched);
+      }
+    }, (err) => console.error('Firestore contracts listener error:', err));
+
+    const unsubInvoices = onSnapshot(collection(db, 'invoices'), (snap) => {
+      if (snap.empty) {
+        INITIAL_INVOICES.forEach((i) => setDoc(doc(db, 'invoices', i.id), sanitizeForFirestore(i)));
+      } else {
+        const fetched = snap.docs.map((d) => d.data() as Invoice);
+        setInvoices(fetched);
+      }
+    }, (err) => console.error('Firestore invoices listener error:', err));
+
+    const unsubIssues = onSnapshot(collection(db, 'issues'), (snap) => {
+      if (snap.empty) {
+        INITIAL_ISSUES.forEach((i) => setDoc(doc(db, 'issues', i.id), sanitizeForFirestore(i)));
+      } else {
+        const fetched = snap.docs.map((d) => d.data() as IssueTicket);
+        setIssues(fetched);
+      }
+    }, (err) => console.error('Firestore issues listener error:', err));
+
+    const unsubNotifs = onSnapshot(collection(db, 'notifications'), (snap) => {
+      if (snap.empty) {
+        INITIAL_NOTIFICATIONS.forEach((n) => setDoc(doc(db, 'notifications', n.id), sanitizeForFirestore(n)));
+      } else {
+        const fetched = snap.docs.map((d) => d.data() as AppNotification);
+        setNotifications(fetched);
+      }
+    }, (err) => console.error('Firestore notifications listener error:', err));
+
+    const unsubJoinReqs = onSnapshot(collection(db, 'joinRequests'), (snap) => {
+      if (snap.empty) {
+        INITIAL_JOIN_REQUESTS.forEach((j) => setDoc(doc(db, 'joinRequests', j.id), sanitizeForFirestore(j)));
+      } else {
+        const fetched = snap.docs.map((d) => d.data() as JoinRequest);
+        setJoinRequests(fetched);
+      }
+    }, (err) => console.error('Firestore joinRequests listener error:', err));
+
+    const unsubLicenses = onSnapshot(collection(db, 'licenses'), (snap) => {
+      if (snap.empty) {
+        INITIAL_LICENSES.forEach((l) => setDoc(doc(db, 'licenses', l.id), sanitizeForFirestore(l)));
+      } else {
+        const fetched = snap.docs.map((d) => d.data() as SystemLicense);
+        setLicenses(fetched);
+      }
+    }, (err) => console.error('Firestore licenses listener error:', err));
+
+    const unsubComplaints = onSnapshot(collection(db, 'complaints'), (snap) => {
+      if (snap.empty) {
+        INITIAL_COMPLAINTS.forEach((c) => setDoc(doc(db, 'complaints', c.id), sanitizeForFirestore(c)));
+      } else {
+        const fetched = snap.docs.map((d) => d.data() as ComplaintReport);
+        setComplaints(fetched);
+      }
+    }, (err) => console.error('Firestore complaints listener error:', err));
+
+    const unsubLogs = onSnapshot(collection(db, 'securityLogs'), (snap) => {
+      if (snap.empty) {
+        INITIAL_SECURITY_LOGS.forEach((s) => setDoc(doc(db, 'securityLogs', s.id), sanitizeForFirestore(s)));
+      } else {
+        const fetched = snap.docs.map((d) => d.data() as SecurityEventLog);
+        setSecurityLogs(fetched);
+      }
+    }, (err) => console.error('Firestore securityLogs listener error:', err));
+
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'main'), (dSnap) => {
+      if (!dSnap.exists()) {
+        setDoc(doc(db, 'settings', 'main'), sanitizeForFirestore(INITIAL_LANDLORD_SETTINGS));
+      } else {
+        setSettings(dSnap.data() as LandlordSettings);
+      }
+    }, (err) => console.error('Firestore settings listener error:', err));
+
+    const unsubTelemetry = onSnapshot(doc(db, 'telemetry', 'main'), (dSnap) => {
+      if (!dSnap.exists()) {
+        setDoc(doc(db, 'telemetry', 'main'), sanitizeForFirestore(INITIAL_TELEMETRY));
+      } else {
+        setTelemetry(dSnap.data() as Record<string, RealtimeTelemetry>);
+      }
+    }, (err) => console.error('Firestore telemetry listener error:', err));
+
+    return () => {
+      unsubUsers();
+      unsubRooms();
+      unsubContracts();
+      unsubInvoices();
+      unsubIssues();
+      unsubNotifs();
+      unsubJoinReqs();
+      unsubLicenses();
+      unsubComplaints();
+      unsubLogs();
+      unsubSettings();
+      unsubTelemetry();
+    };
+  }, []);
+
   // Real-time IoT simulator: slight power and flow fluctuation every 4 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -350,12 +534,25 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const markNotificationAsRead = (id: string) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      prev.map((n) => {
+        if (n.id === id) {
+          const updated = { ...n, isRead: true };
+          saveNotificationToFirestore(updated);
+          return updated;
+        }
+        return n;
+      })
     );
   };
 
   const markAllNotificationsAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setNotifications((prev) =>
+      prev.map((n) => {
+        const updated = { ...n, isRead: true };
+        saveNotificationToFirestore(updated);
+        return updated;
+      })
+    );
   };
 
   const login = (identifier: string, password?: string, role?: UserRole) => {
@@ -521,16 +718,19 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     // If landlord, update or create building settings
     if (userData.role === 'landlord') {
-      setSettings((prev) => ({
-        ...prev,
+      const newSettings = {
+        ...settings,
         landlordId: newId,
         houseName: userData.houseName || `${userData.name} - Nhà trọ Quản lí nhà trọ`,
         houseAddress: userData.houseAddress || 'Số 123 Đường Số 1, TP. Hồ Chí Minh',
-        hostCode: generatedHostCode || prev.hostCode,
-      }));
+        hostCode: generatedHostCode || settings.hostCode,
+      };
+      setSettings(newSettings);
+      saveSettingsToFirestore(newSettings);
     }
 
     setUsers((prev) => [newUser, ...prev]);
+    saveUserToFirestore(newUser);
     setCurrentUser(newUser);
     setIsAuthenticated(true);
 
@@ -603,6 +803,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
 
     setJoinRequests((prev) => [newRequest, ...prev]);
+    saveJoinRequestToFirestore(newRequest);
 
     // Send notification to landlord
     const newNotif: AppNotification = {
@@ -619,6 +820,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       priority: 'high',
     };
     setNotifications((prev) => [newNotif, ...prev]);
+    saveNotificationToFirestore(newNotif);
 
     return {
       success: true,
@@ -789,7 +991,14 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const updateContract = (contractId: string, updates: Partial<Contract>) => {
     setContracts((prev) =>
-      prev.map((c) => (c.id === contractId ? { ...c, ...updates } : c))
+      prev.map((c) => {
+        if (c.id === contractId) {
+          const updated = { ...c, ...updates };
+          saveContractToFirestore(updated);
+          return updated;
+        }
+        return c;
+      })
     );
   };
 
@@ -801,10 +1010,12 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       signedAt: new Date().toLocaleString('vi-VN'),
     };
     setContracts((prev) => [newContract, ...prev]);
+    saveContractToFirestore(newContract);
   };
 
   const deleteContract = (contractId: string) => {
     setContracts((prev) => prev.filter((c) => c.id !== contractId));
+    deleteContractFromFirestore(contractId);
   };
 
   // 2. Landlord approves join request
@@ -986,6 +1197,16 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // 3. Remove/Checkout tenant
   const removeTenantFromRoom = (roomId: string, tenantId: string) => {
     // Vacate room
+    const targetRoom = rooms.find((r) => r.id === roomId);
+    if (targetRoom) {
+      saveRoomToFirestore({
+        ...targetRoom,
+        status: 'available',
+        currentTenantId: undefined,
+        currentTenantName: undefined,
+      });
+    }
+
     setRooms((prev) =>
       prev.map((r) =>
         r.id === roomId
@@ -1000,6 +1221,11 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     );
 
     // Terminate contracts
+    const targetContract = contracts.find((c) => c.roomId === roomId && c.tenantId === tenantId);
+    if (targetContract) {
+      saveContractToFirestore({ ...targetContract, status: 'terminated' });
+    }
+
     setContracts((prev) =>
       prev.map((c) =>
         c.roomId === roomId && c.tenantId === tenantId
@@ -1009,6 +1235,16 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     );
 
     // Update user
+    const targetUser = users.find((u) => u.id === tenantId);
+    if (targetUser) {
+      saveUserToFirestore({
+        ...targetUser,
+        roomId: undefined,
+        landlordId: undefined,
+        status: 'pending_approval',
+      });
+    }
+
     setUsers((prev) =>
       prev.map((u) =>
         u.id === tenantId
@@ -1040,6 +1276,14 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (tenant && tenant.roomId) {
       removeTenantFromRoom(tenant.roomId, tenantId);
     } else {
+      if (tenant) {
+        saveUserToFirestore({
+          ...tenant,
+          roomId: undefined,
+          landlordId: undefined,
+          status: 'pending_approval',
+        });
+      }
       setUsers((prev) =>
         prev.map((u) =>
           u.id === tenantId
@@ -1063,9 +1307,10 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       doorPasscode: Math.floor(100000 + Math.random() * 900000).toString(),
     };
     setRooms((prev) => [...prev, newRoom]);
+    saveRoomToFirestore(newRoom);
 
-    setTelemetry((prev) => ({
-      ...prev,
+    const newTelem = {
+      ...telemetry,
       [newRoomId]: {
         roomId: newRoomId,
         currentKwh: roomData.electricityMeterStart || 100,
@@ -1079,14 +1324,21 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         dailyWaterTrend: [],
         aiAnomalyFlag: false,
       },
-    }));
+    };
+    setTelemetry(newTelem);
+    saveTelemetryToFirestore(newTelem);
   };
 
   const updateRoom = (roomId: string, updates: Partial<Room>) => {
+    const rm = rooms.find((r) => r.id === roomId);
+    if (rm) {
+      saveRoomToFirestore({ ...rm, ...updates });
+    }
     setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, ...updates } : r)));
   };
 
   const deleteRoom = (roomId: string) => {
+    deleteRoomFromFirestore(roomId);
     setRooms((prev) => prev.filter((r) => r.id !== roomId));
   };
 
@@ -1095,6 +1347,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const oldSettings = { ...settings };
     const newSettings = { ...settings, ...updates };
     setSettings(newSettings);
+    saveSettingsToFirestore(newSettings);
 
     if (sendBroadcastNotice) {
       const priceChanges: string[] = [];
@@ -1137,6 +1390,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       priority,
     };
     setNotifications((prev) => [notif, ...prev]);
+    saveNotificationToFirestore(notif);
   };
 
   // 6. Invoices Management
@@ -1210,6 +1464,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       };
 
       setInvoices((prev) => [newInv, ...prev]);
+      saveInvoiceToFirestore(newInv);
 
       // Notify tenant
       if (tenant) {
@@ -1227,6 +1482,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           priority: 'high',
         };
         setNotifications((prev) => [notif, ...prev]);
+        saveNotificationToFirestore(notif);
       }
     });
   };
@@ -1295,6 +1551,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
 
     setInvoices((prev) => [...newInvoices, ...prev]);
+    newInvoices.forEach((inv) => saveInvoiceToFirestore(inv));
 
     // Send broadcast to landlord and tenants
     broadcastNotice(
@@ -1313,23 +1570,34 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const isMultiMonth = prepaidMonths > 1;
 
+    const updatedInv: Invoice = {
+      ...inv,
+      status: 'paid',
+      paidAt: new Date().toLocaleString('vi-VN'),
+      paymentMethod: 'vietqr',
+      transactionRef: `FT${Date.now().toString().slice(-10)}`,
+      prepaidMonthsPaidCount: prepaidMonths,
+    };
+
     setInvoices((prev) =>
-      prev.map((item) =>
-        item.id === invoiceId
-          ? {
-              ...item,
-              status: 'paid',
-              paidAt: new Date().toLocaleString('vi-VN'),
-              paymentMethod: 'vietqr',
-              transactionRef: `FT${Date.now().toString().slice(-10)}`,
-              prepaidMonthsPaidCount: prepaidMonths,
-            }
-          : item
-      )
+      prev.map((item) => (item.id === invoiceId ? updatedInv : item))
     );
+    saveInvoiceToFirestore(updatedInv);
 
     // If multi-month prepaid, update contract prepaid months
     if (isMultiMonth) {
+      const activeContract = contracts.find((c) => c.roomId === inv.roomId && c.status === 'active');
+      if (activeContract) {
+        const updatedContract: Contract = {
+          ...activeContract,
+          prepaidMonthsRemaining: (activeContract.prepaidMonthsRemaining || 0) + (prepaidMonths - 1),
+          prepaidUntil: new Date(Date.now() + prepaidMonths * 30 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split('T')[0],
+        };
+        saveContractToFirestore(updatedContract);
+      }
+
       setContracts((prev) =>
         prev.map((c) =>
           c.roomId === inv.roomId && c.status === 'active'
@@ -1359,6 +1627,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         priority: 'high',
       };
       setNotifications((prev) => [prepayNotice, ...prev]);
+      saveNotificationToFirestore(prepayNotice);
     } else {
       // Regular payment notice to landlord
       const payNotif: AppNotification = {
@@ -1375,6 +1644,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         priority: 'normal',
       };
       setNotifications((prev) => [payNotif, ...prev]);
+      saveNotificationToFirestore(payNotif);
     }
 
     // Trigger celebration confetti
@@ -1391,6 +1661,10 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const confirmInvoicePayment = (invoiceId: string) => {
+    const inv = invoices.find((i) => i.id === invoiceId);
+    if (inv) {
+      saveInvoiceToFirestore({ ...inv, status: 'verified_by_host' });
+    }
     setInvoices((prev) =>
       prev.map((i) => (i.id === invoiceId ? { ...i, status: 'verified_by_host' } : i))
     );
@@ -1405,11 +1679,14 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       timestamp: new Date().toLocaleString('vi-VN'),
     };
     setSecurityLogs((prev) => [newLog, ...prev]);
+    saveSecurityLogToFirestore(newLog);
   };
 
   const toggleMainGate = (targetState?: 'locked' | 'unlocked') => {
     const nextState = targetState || (settings.mainGateState === 'locked' ? 'unlocked' : 'locked');
-    setSettings((prev) => ({ ...prev, mainGateState: nextState }));
+    const updatedSettings = { ...settings, mainGateState: nextState };
+    setSettings(updatedSettings);
+    saveSettingsToFirestore(updatedSettings);
 
     addSecurityLog({
       targetType: 'main_gate',
@@ -1423,12 +1700,14 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const updateMainGateSchedule = (enabled: boolean, lockTime: string, unlockTime: string) => {
-    setSettings((prev) => ({
-      ...prev,
+    const updatedSettings = {
+      ...settings,
       autoLockEnabled: enabled,
       autoLockTime: lockTime,
       autoUnlockTime: unlockTime,
-    }));
+    };
+    setSettings(updatedSettings);
+    saveSettingsToFirestore(updatedSettings);
 
     addSecurityLog({
       targetType: 'main_gate',
@@ -1442,7 +1721,9 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const changeMainGatePIN = (newPin: string) => {
-    setSettings((prev) => ({ ...prev, mainGatePasscode: newPin }));
+    const updatedSettings = { ...settings, mainGatePasscode: newPin };
+    setSettings(updatedSettings);
+    saveSettingsToFirestore(updatedSettings);
 
     addSecurityLog({
       targetType: 'main_gate',
@@ -1462,6 +1743,12 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const toggleRoomDoor = (roomId: string) => {
+    const targetRoom = rooms.find((r) => r.id === roomId);
+    if (targetRoom) {
+      const nextState = targetRoom.doorLockState === 'locked' ? 'unlocked' : 'locked';
+      saveRoomToFirestore({ ...targetRoom, doorLockState: nextState });
+    }
+
     setRooms((prev) =>
       prev.map((r) => {
         if (r.id === roomId) {
@@ -1484,6 +1771,10 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const changeRoomDoorPIN = (roomId: string, newPin: string) => {
     const room = rooms.find((r) => r.id === roomId);
+    if (room) {
+      saveRoomToFirestore({ ...room, doorPasscode: newPin });
+    }
+
     setRooms((prev) =>
       prev.map((r) => (r.id === roomId ? { ...r, doorPasscode: newPin } : r))
     );
@@ -1558,6 +1849,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
 
     setIssues((prev) => [newIssue, ...prev]);
+    saveIssueToFirestore(newIssue);
 
     // Send notification to landlord
     const notif: AppNotification = {
@@ -1574,10 +1866,21 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       priority: data.urgency === 'critical' || data.urgency === 'high' ? 'high' : 'normal',
     };
     setNotifications((prev) => [notif, ...prev]);
+    saveNotificationToFirestore(notif);
   };
 
   const updateIssueStatus = (issueId: string, status: IssueTicket['status'], landlordNote?: string) => {
     const issue = issues.find((i) => i.id === issueId);
+    if (issue) {
+      const updatedIssue = {
+        ...issue,
+        status,
+        landlordNote: landlordNote || issue.landlordNote,
+        resolvedAt: status === 'resolved' ? new Date().toLocaleString('vi-VN') : undefined,
+      };
+      saveIssueToFirestore(updatedIssue);
+    }
+
     setIssues((prev) =>
       prev.map((i) =>
         i.id === issueId
@@ -1607,11 +1910,16 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         priority: 'normal',
       };
       setNotifications((prev) => [notif, ...prev]);
+      saveNotificationToFirestore(notif);
     }
   };
 
   // 11. Admin & System Management
   const toggleUserLock = (userId: string) => {
+    const targetUser = users.find((u) => u.id === userId);
+    if (targetUser) {
+      saveUserToFirestore({ ...targetUser, status: targetUser.status === 'locked' ? 'active' : 'locked' });
+    }
     setUsers((prev) =>
       prev.map((u) =>
         u.id === userId
@@ -1619,6 +1927,12 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           : u
       )
     );
+  };
+
+  const deleteUser = (userId: string) => {
+    if (userId === 'admin_root') return;
+    deleteUserFromFirestore(userId);
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
   };
 
   const submitComplaint = (type: ComplaintReport['type'], title: string, content: string) => {
@@ -1635,6 +1949,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       createdAt: new Date().toLocaleString('vi-VN'),
     };
     setComplaints((prev) => [newComp, ...prev]);
+    saveComplaintToFirestore(newComp);
 
     // Notify Admin
     const adminNotif: AppNotification = {
@@ -1650,23 +1965,50 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       priority: 'high',
     };
     setNotifications((prev) => [adminNotif, ...prev]);
+    saveNotificationToFirestore(adminNotif);
   };
 
-  const updateFeatureFlags = (flags: Partial<SystemFeatureFlags>) => {
+  const updateFeatureFlags = (flags: Partial<SystemFeatureFlags>, targetLandlordId?: string) => {
     setSettings((prev) => {
-      const currentFlags: SystemFeatureFlags = prev.featureFlags || DEFAULT_FEATURE_FLAGS;
-      const updatedFlags: SystemFeatureFlags = {
-        ...currentFlags,
+      const landlordKey = targetLandlordId || prev.landlordId || 'global';
+      const existingMap = prev.landlordFeatureFlags || {};
+      const currentLandlordFlags = existingMap[landlordKey] || prev.featureFlags || DEFAULT_FEATURE_FLAGS;
+      
+      const updatedLandlordFlags: SystemFeatureFlags = {
+        ...currentLandlordFlags,
         ...flags,
       };
-      return {
-        ...prev,
-        featureFlags: updatedFlags,
+
+      const updatedMap = {
+        ...existingMap,
+        [landlordKey]: updatedLandlordFlags,
       };
+
+      const isCurrentLandlord = !targetLandlordId || targetLandlordId === prev.landlordId || targetLandlordId === currentUser.id;
+
+      const updatedSettings: LandlordSettings = {
+        ...prev,
+        featureFlags: isCurrentLandlord ? updatedLandlordFlags : (prev.featureFlags || updatedLandlordFlags),
+        landlordFeatureFlags: updatedMap,
+      };
+
+      saveSettingsToFirestore(updatedSettings);
+      return updatedSettings;
     });
   };
 
+  const getFeatureFlagsForLandlord = (landlordId?: string): SystemFeatureFlags => {
+    if (!landlordId) {
+      return settings.featureFlags || DEFAULT_FEATURE_FLAGS;
+    }
+    return settings.landlordFeatureFlags?.[landlordId] || settings.featureFlags || DEFAULT_FEATURE_FLAGS;
+  };
+
   const resolveComplaint = (complaintId: string, response: string) => {
+    const comp = complaints.find((c) => c.id === complaintId);
+    if (comp) {
+      saveComplaintToFirestore({ ...comp, status: 'resolved', adminResponse: response });
+    }
     setComplaints((prev) =>
       prev.map((c) =>
         c.id === complaintId
@@ -1691,12 +2033,14 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       pricePaid: plan === 'Đại đô thị (Enterprise)' ? 4900000 : plan === 'Chuyên nghiệp (Pro)' ? 2400000 : 990000,
     };
     setLicenses((prev) => [newLic, ...prev]);
+    saveLicenseToFirestore(newLic);
   };
 
   const updateUserProfile = (updates: Partial<User>) => {
     setCurrentUser((prev) => {
       const updated = { ...prev, ...updates };
       setUsers((uList) => uList.map((u) => (u.id === prev.id ? updated : u)));
+      saveUserToFirestore(updated);
       return updated;
     });
   };
@@ -1718,6 +2062,19 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setLicenses(INITIAL_LICENSES);
     setComplaints(INITIAL_COMPLAINTS);
     setSecurityLogs(INITIAL_SECURITY_LOGS);
+
+    INITIAL_USERS.forEach((u) => setDoc(doc(db, 'users', u.id), sanitizeForFirestore(u)));
+    INITIAL_ROOMS.forEach((r) => setDoc(doc(db, 'rooms', r.id), sanitizeForFirestore(r)));
+    INITIAL_CONTRACTS.forEach((c) => setDoc(doc(db, 'contracts', c.id), sanitizeForFirestore(c)));
+    INITIAL_INVOICES.forEach((i) => setDoc(doc(db, 'invoices', i.id), sanitizeForFirestore(i)));
+    INITIAL_ISSUES.forEach((i) => setDoc(doc(db, 'issues', i.id), sanitizeForFirestore(i)));
+    INITIAL_NOTIFICATIONS.forEach((n) => setDoc(doc(db, 'notifications', n.id), sanitizeForFirestore(n)));
+    INITIAL_JOIN_REQUESTS.forEach((j) => setDoc(doc(db, 'joinRequests', j.id), sanitizeForFirestore(j)));
+    INITIAL_LICENSES.forEach((l) => setDoc(doc(db, 'licenses', l.id), sanitizeForFirestore(l)));
+    INITIAL_COMPLAINTS.forEach((c) => setDoc(doc(db, 'complaints', c.id), sanitizeForFirestore(c)));
+    INITIAL_SECURITY_LOGS.forEach((s) => setDoc(doc(db, 'securityLogs', s.id), sanitizeForFirestore(s)));
+    setDoc(doc(db, 'settings', 'main'), sanitizeForFirestore(INITIAL_LANDLORD_SETTINGS));
+    setDoc(doc(db, 'telemetry', 'main'), sanitizeForFirestore(INITIAL_TELEMETRY));
   };
 
   return (
@@ -1779,7 +2136,9 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         createIssue,
         updateIssueStatus,
         updateFeatureFlags,
+        getFeatureFlagsForLandlord,
         toggleUserLock,
+        deleteUser,
         submitComplaint,
         resolveComplaint,
         issueLicense,

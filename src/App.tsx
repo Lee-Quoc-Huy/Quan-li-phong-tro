@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { RentalProvider, useRental } from './context/RentalContext';
 import { Sidebar } from './components/Sidebar';
 import { MobileHeader } from './components/MobileHeader';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { NotificationDrawer } from './components/Common/NotificationDrawer';
 import { EmergencyAlertModal } from './components/Common/EmergencyAlertModal';
 
@@ -97,7 +98,7 @@ const MainApp: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-teal-500 selection:text-white flex">
       
-      {/* Left Sidebar */}
+      {/* Left Sidebar (Desktop & Mobile Drawer) */}
       <Sidebar
         activeTab={activeTab}
         onNavigateTab={(tab) => {
@@ -118,12 +119,20 @@ const MainApp: React.FC = () => {
           onOpenNotifications={() => setIsNotifDrawerOpen(true)}
         />
 
-        {/* Content Container */}
-        <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+        {/* Content Container (extra padding-bottom for Mobile Bottom Bar) */}
+        <main className="flex-1 w-full max-w-6xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6 pb-24 lg:pb-8">
           {renderContent()}
         </main>
 
-
+        {/* Mobile Bottom Navigation Bar (Hidden on lg screens) */}
+        <MobileBottomNav
+          activeTab={activeTab}
+          onNavigateTab={(tab) => {
+            setActiveTab(tab);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenMenu={() => setIsMobileSidebarOpen(true)}
+        />
 
       </div>
 
@@ -139,6 +148,7 @@ const MainApp: React.FC = () => {
     </div>
   );
 };
+
 
 export function App() {
   return (

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useRental } from '../../context/RentalContext';
+import { ADMIN_USER } from '../../mockData';
 import { SystemFeatureFlags } from '../../types';
 import { 
   Shield, 
@@ -33,7 +34,8 @@ import {
   XCircle,
   HelpCircle,
   Clock,
-  Layers
+  Layers,
+  Trash2,
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -46,9 +48,11 @@ export const AdminDashboard: React.FC = () => {
     securityLogs, 
     settings, 
     updateFeatureFlags,
+    getFeatureFlagsForLandlord,
     triggerEmergencyAlarm, 
     dismissEmergencyAlarm,
     toggleUserLock,
+    deleteUser,
     resolveComplaint,
     resetAllData 
   } = useRental();
@@ -61,30 +65,28 @@ export const AdminDashboard: React.FC = () => {
   const tenants = users.filter((u) => u.role === 'tenant');
   const totalVolume = invoices.reduce((acc, i) => acc + i.totalAmount, 0);
 
-  // Active feature flags with fallbacks
-  const flags: SystemFeatureFlags = settings.featureFlags || {
-    enableSmartDoorLock: true,
-    enableAutoGate: true,
-    enableIoTMeters: true,
-    enableAutoBilling: true,
-    enableVietQR: true,
-    enableDigitalContracts: true,
-    enableIssueTickets: true,
-    enableGoogleSheetSync: true,
-    enableComplaints: true,
-    enableEmergencyAlarm: true,
-  };
+  // Selected landlord for feature flags tab
+  const [selectedLandlordId, setSelectedLandlordId] = useState<string>('');
+
+  // Auto select first landlord if available and none selected
+  const activeLandlord = landlords.find((l) => l.id === selectedLandlordId) || landlords[0];
+  const activeLandlordId = activeLandlord ? activeLandlord.id : (settings.landlordId || 'default_host');
+
+  // Active feature flags for selected landlord
+  const flags: SystemFeatureFlags = getFeatureFlagsForLandlord(activeLandlordId);
 
   const handleToggle = (key: keyof SystemFeatureFlags) => {
     const updatedValue = !flags[key];
-    updateFeatureFlags({ [key]: updatedValue });
-    setStatusMessage(`Đã ${updatedValue ? 'kích hoạt (BẬT)' : 'hủy kích hoạt (TẮT)'} tính năng thành công!`);
+    updateFeatureFlags({ [key]: updatedValue }, activeLandlordId);
+    const targetName = activeLandlord ? activeLandlord.name : 'Chủ trọ';
+    setStatusMessage(`Đã ${updatedValue ? 'BẬT' : 'TẮT'} tính năng cho "${targetName}" thành công!`);
     setTimeout(() => setStatusMessage(null), 3000);
   };
 
   const applyPreset = (type: 'all' | 'starter' | 'security_only') => {
+    let presetFlags: Partial<SystemFeatureFlags> = {};
     if (type === 'all') {
-      updateFeatureFlags({
+      presetFlags = {
         enableSmartDoorLock: true,
         enableAutoGate: true,
         enableIoTMeters: true,
@@ -95,10 +97,9 @@ export const AdminDashboard: React.FC = () => {
         enableGoogleSheetSync: true,
         enableComplaints: true,
         enableEmergencyAlarm: true,
-      });
-      setStatusMessage('Đã áp dụng Gói Đầy Đủ (Full Features) cho Chủ trọ!');
+      };
     } else if (type === 'starter') {
-      updateFeatureFlags({
+      presetFlags = {
         enableSmartDoorLock: false,
         enableAutoGate: false,
         enableIoTMeters: true,
@@ -109,10 +110,9 @@ export const AdminDashboard: React.FC = () => {
         enableGoogleSheetSync: false,
         enableComplaints: true,
         enableEmergencyAlarm: false,
-      });
-      setStatusMessage('Đã cấu hình Gói Cơ Bản (Starter) cho Chủ trọ!');
+      };
     } else if (type === 'security_only') {
-      updateFeatureFlags({
+      presetFlags = {
         enableSmartDoorLock: true,
         enableAutoGate: true,
         enableIoTMeters: false,
@@ -123,9 +123,12 @@ export const AdminDashboard: React.FC = () => {
         enableGoogleSheetSync: false,
         enableComplaints: true,
         enableEmergencyAlarm: true,
-      });
-      setStatusMessage('Đã cấu hình Gói An Ninh & Khóa IoT thông minh!');
+      };
     }
+
+    updateFeatureFlags(presetFlags, activeLandlordId);
+    const targetName = activeLandlord ? activeLandlord.name : 'Chủ trọ';
+    setStatusMessage(`Đã áp dụng mẫu cấu hình tính năng cho "${targetName}"!`);
     setTimeout(() => setStatusMessage(null), 3000);
   };
 
@@ -388,17 +391,82 @@ export const AdminDashboard: React.FC = () => {
       {activeTab === 'features' && (
         <div className="space-y-6">
           
+          {/* Landlord Selector */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-teal-600" />
+                <h3 className="font-bold text-slate-900 text-sm">
+                  1. Chọn Chủ Trọ Để Cấu Hình Tính Năng Riêng Biệt
+                </h3>
+              </div>
+              <span className="text-xs text-slate-500 font-medium">
+                {landlords.length} Chủ trọ trên hệ thống
+              </span>
+            </div>
+
+            {landlords.length === 0 ? (
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">
+                Chưa có tài khoản Chủ trọ nào đăng ký. Cấu hình bên dưới sẽ áp dụng làm mặc định chung cho hệ thống.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {landlords.map((l) => {
+                  const isSelected = (l.id === activeLandlordId);
+                  const lFlags = getFeatureFlagsForLandlord(l.id);
+                  const activeCount = Object.values(lFlags).filter(Boolean).length;
+
+                  return (
+                    <button
+                      key={l.id}
+                      onClick={() => setSelectedLandlordId(l.id)}
+                      className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'bg-teal-50/80 border-teal-500 ring-2 ring-teal-500/20 shadow-xs'
+                          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={l.avatar}
+                          alt={l.name}
+                          className="w-9 h-9 rounded-lg object-cover border border-slate-200 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 text-xs truncate">
+                            {l.name}
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+                            Mã: <span className="font-mono font-bold text-teal-700">{l.hostCode || settings.hostCode}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          isSelected ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {activeCount}/10 BẬT
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Header & Quick Preset Buttons */}
           <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-teal-600" />
                 <h2 className="font-bold text-slate-900 text-sm">
-                  Cấu Hình Tính Năng Theo Nhu Cầu Chủ Trọ
+                  2. Cấu Hình Tính Năng Riêng Cho: <span className="text-teal-700 underline font-extrabold">{activeLandlord?.name || 'Chủ trọ'}</span>
                 </h2>
               </div>
               <p className="text-xs text-slate-500 max-w-2xl">
-                Với tư cách là Quản Trị Viên (Admin), bạn có toàn quyền kích hoạt hoặc tạm dừng bất kỳ module tính năng nào theo yêu cầu hoặc gói dịch vụ mà chủ nhà đã đăng ký.
+                Với tư cách Admin, các thiết lập tính năng dưới đây <strong>chỉ áp dụng riêng cho Chủ trọ được chọn</strong> và hoàn toàn không ảnh hưởng đến các chủ trọ khác.
               </p>
             </div>
 
@@ -466,7 +534,7 @@ export const AdminDashboard: React.FC = () => {
                     <div className="flex items-center gap-1.5">
                       <span className={`w-2 h-2 rounded-full ${isEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
                       <span className={`text-xs font-bold ${isEnabled ? 'text-emerald-700' : 'text-slate-500'}`}>
-                        {isEnabled ? 'Đang BẬT cho Chủ trọ' : 'Đang TẮT (Ẩn khỏi giao diện)'}
+                        {isEnabled ? `Đang BẬT cho ${activeLandlord?.name || 'Chủ trọ'}` : 'Đang TẮT (Ẩn khỏi giao diện)'}
                       </span>
                     </div>
 
@@ -491,84 +559,331 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 2: USERS LIST */}
+      {/* TAB 2: USERS LIST (HIERARCHICAL / GROUPED BY LANDLORD) */}
       {activeTab === 'users' && (
-        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            <h2 className="font-bold text-slate-900 text-sm">
-              Toàn Bộ Tài Khoản Người Dùng ({users.length})
-            </h2>
+        <div className="space-y-6">
+          
+          {/* Search & Header Bar */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="font-bold text-slate-900 text-sm">
+                Danh Sách Tài Khoản Hệ Thống ({users.length})
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Tài khoản được phân nhóm theo từng Chủ Trọ và danh sách Khách Thuê trực thuộc
+              </p>
+            </div>
+
             <input
               type="text"
-              placeholder="Tìm theo tên, SĐT, CCCD..."
+              placeholder="Tìm theo tên, SĐT, CCCD, Mã dãy trọ..."
               value={searchUser}
               onChange={(e) => setSearchUser(e.target.value)}
-              className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500 w-full sm:w-64"
+              className="px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500 w-full sm:w-72"
             />
           </div>
 
-          <div className="divide-y divide-slate-100 text-xs">
-            {users
-              .filter(u => 
-                u.name.toLowerCase().includes(searchUser.toLowerCase()) || 
-                u.phone.includes(searchUser) ||
-                (u.email && u.email.toLowerCase().includes(searchUser.toLowerCase()))
-              )
-              .map((u) => (
-                <div key={u.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <img src={u.avatar} alt={u.name} className="w-10 h-10 rounded-xl object-cover border border-slate-200" />
-                    <div>
-                      <div className="font-bold text-slate-900 flex items-center gap-2">
-                        {u.name}
-                        {u.id === 'admin_root' && (
-                          <span className="text-[10px] bg-slate-900 text-teal-400 font-mono px-2 py-0.2 rounded-full font-bold">
-                            ROOT
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-slate-500 text-[11px] mt-0.5">
-                        SĐT: <strong className="text-slate-700">{u.phone}</strong> • Email: {u.email}
-                      </div>
-                      {u.hostCode && (
-                        <div className="text-[10px] text-teal-700 font-mono font-bold mt-0.5">
-                          Mã Dãy Trọ: {u.hostCode}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+          {/* GROUP 1: ROOT ADMIN */}
+          <div className="bg-slate-900 rounded-2xl p-5 text-white shadow-xs space-y-3">
+            <div className="text-xs font-bold uppercase tracking-wider text-teal-400 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4" />
+              Ban Quản Trị Hệ Thống (Root Admin)
+            </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-center">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                      u.role === 'admin'
-                        ? 'bg-purple-100 text-purple-800'
-                        : u.role === 'landlord'
-                        ? 'bg-teal-100 text-teal-800'
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {u.role === 'admin' ? 'Quản Trị Viên' : u.role === 'landlord' ? 'Chủ Trọ' : 'Khách Thuê'}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+              <div className="flex items-center gap-3">
+                <img src={ADMIN_USER.avatar} alt="Admin" className="w-11 h-11 rounded-xl object-cover border-2 border-teal-400" />
+                <div>
+                  <div className="font-bold text-sm text-white flex items-center gap-2">
+                    Lê Quốc Huy (Admin)
+                    <span className="px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-[10px] font-mono font-bold border border-teal-500/40">
+                      60.wuy.lii.06@gmail.com
                     </span>
-
-                    {u.id !== 'admin_root' && (
-                      <button
-                        onClick={() => {
-                          toggleUserLock(u.id);
-                          setStatusMessage(`Đã ${u.status === 'locked' ? 'mở khóa' : 'khóa'} tài khoản ${u.name}!`);
-                          setTimeout(() => setStatusMessage(null), 3000);
-                        }}
-                        className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
-                          u.status === 'locked'
-                            ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
-                      >
-                        {u.status === 'locked' ? 'Mở Khóa' : 'Khóa'}
-                      </button>
-                    )}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    SĐT: 0918889999 • CCCD: 079206008899 • Quyền hạn: Toàn quyền quản trị hệ thống
                   </div>
                 </div>
-              ))}
+              </div>
+
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-teal-400/20 text-teal-300 border border-teal-400/30 self-start sm:self-center">
+                HOẠT ĐỘNG
+              </span>
+            </div>
           </div>
+
+          {/* GROUP 2: LANDLORDS & THEIR DIRECT TENANTS */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <Building className="w-4 h-4 text-teal-600" />
+                Danh Sách Chủ Trọ & Khách Thuê Trực Thuộc ({landlords.length} Chủ trọ)
+              </h3>
+            </div>
+
+            {landlords.length === 0 ? (
+              <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-xs text-slate-400 space-y-2">
+                <Building className="w-8 h-8 mx-auto text-slate-300" />
+                <div>Chưa có chủ trọ nào đăng ký trên hệ thống.</div>
+              </div>
+            ) : (
+              landlords
+                .filter(l => 
+                  !searchUser || 
+                  l.name.toLowerCase().includes(searchUser.toLowerCase()) || 
+                  l.phone.includes(searchUser) ||
+                  (l.email && l.email.toLowerCase().includes(searchUser.toLowerCase())) ||
+                  (l.hostCode && l.hostCode.toLowerCase().includes(searchUser.toLowerCase()))
+                )
+                .map((l) => {
+                  // Find tenants belonging to this landlord
+                  const landlordTenants = users.filter(
+                    (u) => u.role === 'tenant' && (u.landlordId === l.id || (!u.landlordId && l.id === landlords[0]?.id))
+                  );
+
+                  const filteredTenants = landlordTenants.filter(
+                    (t) =>
+                      !searchUser ||
+                      t.name.toLowerCase().includes(searchUser.toLowerCase()) ||
+                      t.phone.includes(searchUser) ||
+                      (t.email && t.email.toLowerCase().includes(searchUser.toLowerCase())) ||
+                      (t.idCard && t.idCard.includes(searchUser))
+                  );
+
+                  return (
+                    <div key={l.id} className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                      
+                      {/* Landlord Header Box */}
+                      <div className="p-4 bg-teal-50/50 border-b border-teal-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3.5">
+                          <img src={l.avatar} alt={l.name} className="w-11 h-11 rounded-xl object-cover border border-teal-200 shadow-2xs" />
+                          <div>
+                            <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                              <span>{l.name}</span>
+                              <span className="px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 text-[10px] font-bold uppercase">
+                                Chủ Trọ
+                              </span>
+                              {l.hostCode && (
+                                <span className="px-2 py-0.5 rounded-full bg-slate-900 text-amber-300 font-mono text-[10px] font-bold">
+                                  Mã: {l.hostCode}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-600 mt-0.5">
+                              SĐT: <strong className="text-slate-800">{l.phone}</strong> • Email: {l.email || 'N/A'} • Ngày tham gia: {l.joinedAt}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                          <span className="px-2.5 py-1 rounded-lg bg-teal-100 text-teal-900 text-xs font-bold">
+                            {landlordTenants.length} Khách thuê
+                          </span>
+
+                          <button
+                            onClick={() => {
+                              toggleUserLock(l.id);
+                              setStatusMessage(`Đã ${l.status === 'locked' ? 'mở khóa' : 'khóa'} tài khoản ${l.name}!`);
+                              setTimeout(() => setStatusMessage(null), 3000);
+                            }}
+                            className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                              l.status === 'locked'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {l.status === 'locked' ? 'Mở Khóa' : 'Khóa'}
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`XÁC NHẬN XÓA TÀI KHOẢN CHỦ TRỌ:\n\nBạn có chắc chắn muốn xóa vĩnh viễn chủ trọ "${l.name}" (${l.phone}) khỏi hệ thống không?`)) {
+                                deleteUser(l.id);
+                                setStatusMessage(`Đã xóa vĩnh viễn tài khoản ${l.name}!`);
+                                setTimeout(() => setStatusMessage(null), 3000);
+                              }
+                            }}
+                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white border border-rose-200 transition-colors flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Xóa</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Direct Tenants Nested List */}
+                      <div className="p-4 bg-slate-50/40 space-y-3">
+                        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-slate-400" />
+                          Danh sách khách thuê thuộc dãy trọ của {l.name} ({filteredTenants.length}):
+                        </div>
+
+                        {filteredTenants.length === 0 ? (
+                          <div className="p-4 text-center text-xs text-slate-400 italic bg-white rounded-xl border border-slate-200/60">
+                            Chưa có khách thuê nào đăng ký hoặc được duyệt vào dãy trọ này.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {filteredTenants.map((t) => {
+                              const myRoom = rooms.find((r) => r.id === t.roomId || r.currentTenantId === t.id);
+
+                              return (
+                                <div
+                                  key={t.id}
+                                  className="p-3.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3 text-xs"
+                                >
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <img src={t.avatar} alt={t.name} className="w-9 h-9 rounded-lg object-cover border border-slate-200 shrink-0" />
+                                    <div className="min-w-0">
+                                      <div className="font-bold text-slate-900 truncate flex items-center gap-1.5">
+                                        <span>{t.name}</span>
+                                        {myRoom && (
+                                          <span className="px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
+                                            {myRoom.roomNumber}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+                                        SĐT: <strong className="text-slate-700">{t.phone}</strong> • CCCD: {t.idCard || 'Chưa cập nhật'}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <button
+                                      onClick={() => {
+                                        toggleUserLock(t.id);
+                                        setStatusMessage(`Đã ${t.status === 'locked' ? 'mở khóa' : 'khóa'} tài khoản ${t.name}!`);
+                                        setTimeout(() => setStatusMessage(null), 3000);
+                                      }}
+                                      className={`px-2 py-1 rounded text-[11px] font-semibold border transition-colors ${
+                                        t.status === 'locked'
+                                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                          : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                                      }`}
+                                    >
+                                      {t.status === 'locked' ? 'Mở Khóa' : 'Khóa'}
+                                    </button>
+
+                                    <button
+                                      onClick={() => {
+                                        if (window.confirm(`Xóa vĩnh viễn khách thuê "${t.name}" (${t.phone})?`)) {
+                                          deleteUser(t.id);
+                                          setStatusMessage(`Đã xóa tài khoản ${t.name}!`);
+                                          setTimeout(() => setStatusMessage(null), 3000);
+                                        }
+                                      }}
+                                      className="p-1 rounded bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white border border-rose-200 transition-colors"
+                                      title="Xóa khách thuê"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  );
+                })
+            )}
+          </div>
+
+          {/* GROUP 3: UNASSIGNED / UNVERIFIED USERS */}
+          {(() => {
+            const unassignedList = users.filter(
+              (u) =>
+                u.role === 'tenant' &&
+                !u.landlordId &&
+                landlords.every((l) => l.id !== u.landlordId)
+            );
+
+            const filteredUnassigned = unassignedList.filter(
+              (u) =>
+                !searchUser ||
+                u.name.toLowerCase().includes(searchUser.toLowerCase()) ||
+                u.phone.includes(searchUser) ||
+                (u.email && u.email.toLowerCase().includes(searchUser.toLowerCase()))
+            );
+
+            return (
+              <div className="bg-white rounded-2xl border border-amber-200/90 shadow-2xs p-5 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-amber-100">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <h3 className="font-bold text-slate-900 text-sm">
+                      Tài Khoản Chưa Xác Minh / Chưa Thuộc Chủ Trọ Nào ({unassignedList.length})
+                    </h3>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold">
+                    Cần ghép trọ / Xác minh
+                  </span>
+                </div>
+
+                {filteredUnassigned.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-slate-400 italic">
+                    Không có tài khoản nào chưa thuộc chủ trọ hoặc đang chờ xác minh.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 text-xs">
+                    {filteredUnassigned.map((u) => (
+                      <div key={u.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <img src={u.avatar} alt={u.name} className="w-10 h-10 rounded-xl object-cover border border-slate-200" />
+                          <div>
+                            <div className="font-bold text-slate-900 flex items-center gap-2">
+                              {u.name}
+                              <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.2 rounded-full">
+                                Chưa có Chủ trọ
+                              </span>
+                            </div>
+                            <div className="text-slate-500 text-[11px] mt-0.5">
+                              SĐT: <strong className="text-slate-700">{u.phone}</strong> • Email: {u.email || 'N/A'} • CCCD: {u.idCard || 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                          <button
+                            onClick={() => {
+                              toggleUserLock(u.id);
+                              setStatusMessage(`Đã ${u.status === 'locked' ? 'mở khóa' : 'khóa'} tài khoản ${u.name}!`);
+                              setTimeout(() => setStatusMessage(null), 3000);
+                            }}
+                            className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                              u.status === 'locked'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                            }`}
+                          >
+                            {u.status === 'locked' ? 'Mở Khóa' : 'Khóa'}
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Xác nhận xóa tài khoản "${u.name}" (${u.phone})?`)) {
+                                deleteUser(u.id);
+                                setStatusMessage(`Đã xóa vĩnh viễn tài khoản ${u.name}!`);
+                                setTimeout(() => setStatusMessage(null), 3000);
+                              }
+                            }}
+                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white border border-rose-200 transition-colors flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Xóa</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
         </div>
       )}
 

@@ -1,0 +1,161 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "System user profiles for tenants, landlords, and admin",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["tenant", "landlord", "admin"] },
+        "avatar": { "type": "string" },
+        "age": { "type": "number" },
+        "idCard": { "type": "string" },
+        "hometown": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "locked", "pending_approval"] },
+        "joinedAt": { "type": "string" },
+        "hostCode": { "type": "string" },
+        "landlordId": { "type": "string" },
+        "roomId": { "type": "string" },
+        "licenseTier": { "type": "string", "enum": ["standard", "pro", "enterprise"] }
+      },
+      "required": ["id", "name", "email", "phone", "role", "status", "joinedAt"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "Rental property rooms",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "landlordId": { "type": "string" },
+        "roomNumber": { "type": "string" },
+        "floor": { "type": "number" },
+        "areaM2": { "type": "number" },
+        "basePrice": { "type": "number" },
+        "amenities": { "type": "array" },
+        "status": { "type": "string", "enum": ["available", "occupied", "maintenance"] },
+        "currentTenantId": { "type": "string" },
+        "currentTenantName": { "type": "string" },
+        "doorLockState": { "type": "string", "enum": ["locked", "unlocked"] },
+        "doorPasscode": { "type": "string" },
+        "securityStatus": { "type": "string", "enum": ["secure", "warning", "tampered"] },
+        "electricityMeterStart": { "type": "number" },
+        "waterMeterStart": { "type": "number" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "landlordId", "roomNumber", "floor", "basePrice", "status"]
+    },
+    "Contract": {
+      "title": "Rental Contract",
+      "description": "Digital rental contracts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "contractCode": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "tenantName": { "type": "string" },
+        "tenantPhone": { "type": "string" },
+        "tenantIdCard": { "type": "string" },
+        "landlordId": { "type": "string" },
+        "landlordName": { "type": "string" },
+        "roomId": { "type": "string" },
+        "roomNumber": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "depositAmount": { "type": "number" },
+        "monthlyRent": { "type": "number" },
+        "prepaidMonthsRemaining": { "type": "number" },
+        "prepaidUntil": { "type": "string" },
+        "terms": { "type": "array" },
+        "status": { "type": "string", "enum": ["active", "pending", "expired", "terminated"] },
+        "signedAt": { "type": "string" }
+      },
+      "required": ["id", "contractCode", "tenantId", "landlordId", "roomId", "status"]
+    },
+    "Invoice": {
+      "title": "Monthly Invoice",
+      "description": "Monthly utility and rent invoices",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceCode": { "type": "string" },
+        "landlordId": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "tenantName": { "type": "string" },
+        "roomId": { "type": "string" },
+        "roomNumber": { "type": "string" },
+        "monthYear": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "rentAmount": { "type": "number" },
+        "isRentPrepaid": { "type": "boolean" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid", "verified_by_host"] }
+      },
+      "required": ["id", "invoiceCode", "landlordId", "tenantId", "roomId", "totalAmount", "status"]
+    },
+    "IssueTicket": {
+      "title": "Issue Ticket",
+      "description": "Maintenance and repair issue reports",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ticketCode": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "landlordId": { "type": "string" },
+        "roomId": { "type": "string" },
+        "category": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "urgency": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "ticketCode", "tenantId", "landlordId", "roomId", "title", "status"]
+    },
+    "JoinRequest": {
+      "title": "Join Request",
+      "description": "Tenant join requests to landlord house",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "tenantName": { "type": "string" },
+        "hostCodeInput": { "type": "string" },
+        "landlordId": { "type": "string" },
+        "roomIdRequested": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "tenantId", "landlordId", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile collection"
+    },
+    "/rooms/{roomId}": {
+      "schema": { "$ref": "#/entities/Room" },
+      "description": "Rooms collection"
+    },
+    "/contracts/{contractId}": {
+      "schema": { "$ref": "#/entities/Contract" },
+      "description": "Contracts collection"
+    },
+    "/invoices/{invoiceId}": {
+      "schema": { "$ref": "#/entities/Invoice" },
+      "description": "Invoices collection"
+    },
+    "/issueTickets/{issueId}": {
+      "schema": { "$ref": "#/entities/IssueTicket" },
+      "description": "Issue tickets collection"
+    },
+    "/joinRequests/{requestId}": {
+      "schema": { "$ref": "#/entities/JoinRequest" },
+      "description": "Join requests collection"
+    }
+  }
+}

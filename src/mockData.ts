@@ -72,7 +72,6 @@ export const INITIAL_LANDLORD_SETTINGS: LandlordSettings = {
   
   googleSheetWebhookUrl: 'https://script.google.com/macros/s/AKfycbyi1xXWGQy3nEBzEuO-essoeids5-5Uecz9TuTeSclxc6rRPO_foQ78BT1lpsxeO6Ig/exec',
   googleSheetSyncEnabled: true,
-  googleSheetLastSync: undefined,
 };
 
 export const INITIAL_ROOMS: Room[] = [
