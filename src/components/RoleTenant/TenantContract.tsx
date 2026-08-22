@@ -122,7 +122,7 @@ export const TenantContract: React.FC<TenantContractProps> = ({ onNavigateTab })
             <div className="font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-slate-200">
               <Building className="w-4 h-4 text-teal-600" /> BÊN CHO THUÊ (BÊN A)
             </div>
-            <div><strong>Chủ nhà:</strong> {contract.landlordName}</div>
+            <div><strong>Chủ nhà:</strong> {contract.landlordName || settings.accountName || 'Chủ trọ'}</div>
             <div><strong>Dãy trọ:</strong> {settings.houseName}</div>
             <div><strong>Địa chỉ:</strong> {settings.houseAddress}</div>
             <div><strong>Mã chủ trọ:</strong> <span className="font-mono font-bold text-teal-700">{settings.hostCode}</span></div>

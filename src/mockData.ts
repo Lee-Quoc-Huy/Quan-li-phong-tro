@@ -75,7 +75,14 @@ export const INITIAL_LANDLORD_SETTINGS: LandlordSettings = {
   googleSheetLastSync: undefined,
 };
 
-export const INITIAL_ROOMS: Room[] = [];
+export const INITIAL_ROOMS: Room[] = [
+  { id: 'room_101', landlordId: 'landlord_demo', roomNumber: 'Phòng 101', floor: 1, areaM2: 25, basePrice: 2500000, amenities: ['Điều hòa', 'Tủ lạnh', 'Wifi'], status: 'available', doorLockState: 'locked', doorPasscode: '101101', securityStatus: 'secure', electricityMeterStart: 120, waterMeterStart: 45 },
+  { id: 'room_102', landlordId: 'landlord_demo', roomNumber: 'Phòng 102', floor: 1, areaM2: 25, basePrice: 2500000, amenities: ['Điều hòa', 'Nóng lạnh', 'Wifi'], status: 'available', doorLockState: 'locked', doorPasscode: '102102', securityStatus: 'secure', electricityMeterStart: 180, waterMeterStart: 52 },
+  { id: 'room_103', landlordId: 'landlord_demo', roomNumber: 'Phòng 103', floor: 1, areaM2: 28, basePrice: 2800000, amenities: ['Điều hòa', 'Nóng lạnh', 'Ban công'], status: 'available', doorLockState: 'locked', doorPasscode: '103103', securityStatus: 'secure', electricityMeterStart: 210, waterMeterStart: 60 },
+  { id: 'room_201', landlordId: 'landlord_demo', roomNumber: 'Phòng 201', floor: 2, areaM2: 25, basePrice: 2600000, amenities: ['Điều hòa', 'Wifi'], status: 'available', doorLockState: 'locked', doorPasscode: '201201', securityStatus: 'secure', electricityMeterStart: 140, waterMeterStart: 48 },
+  { id: 'room_202', landlordId: 'landlord_demo', roomNumber: 'Phòng 202', floor: 2, areaM2: 25, basePrice: 2600000, amenities: ['Điều hòa', 'Wifi'], status: 'available', doorLockState: 'locked', doorPasscode: '202202', securityStatus: 'secure', electricityMeterStart: 160, waterMeterStart: 50 },
+  { id: 'room_203', landlordId: 'landlord_demo', roomNumber: 'Phòng 203', floor: 2, areaM2: 30, basePrice: 2900000, amenities: ['Điều hòa', 'Ban công', 'Tủ lạnh'], status: 'available', doorLockState: 'locked', doorPasscode: '203203', securityStatus: 'secure', electricityMeterStart: 190, waterMeterStart: 58 },
+];
 
 export const INITIAL_CONTRACTS: Contract[] = [];
 

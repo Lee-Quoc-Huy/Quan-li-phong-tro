@@ -107,6 +107,11 @@ interface RentalContextType {
   updatePricing: (updates: Partial<LandlordSettings>, sendBroadcastNotice?: boolean) => void;
   broadcastNotice: (title: string, message: string, priority?: 'normal' | 'high' | 'urgent') => void;
   
+  // Actions - Contract Management
+  updateContract: (contractId: string, updates: Partial<Contract>) => void;
+  createContractCustom: (contract: Omit<Contract, 'id' | 'contractCode' | 'signedAt'>) => void;
+  deleteContract: (contractId: string) => void;
+  
   // Actions - Invoices & Payments
   createManualInvoice: (data: {
     roomId: string;
@@ -202,7 +207,15 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const [rooms, setRooms] = useState<Room[]>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_rooms`);
-    return saved ? JSON.parse(saved) : INITIAL_ROOMS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        // fallback
+      }
+    }
+    return INITIAL_ROOMS;
   });
 
   const [contracts, setContracts] = useState<Contract[]>(() => {
@@ -758,13 +771,97 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }));
   };
 
+  const getLandlordName = () => {
+    if (currentUser.role === 'landlord' && currentUser.name) {
+      return currentUser.name;
+    }
+    const landlordUser = users.find(
+      (u) => u.role === 'landlord' || u.id === settings.landlordId
+    );
+    if (landlordUser?.name) {
+      return landlordUser.name;
+    }
+    if (settings.accountName) {
+      return settings.accountName;
+    }
+    return 'Chủ trọ';
+  };
+
+  const updateContract = (contractId: string, updates: Partial<Contract>) => {
+    setContracts((prev) =>
+      prev.map((c) => (c.id === contractId ? { ...c, ...updates } : c))
+    );
+  };
+
+  const createContractCustom = (contract: Omit<Contract, 'id' | 'contractCode' | 'signedAt'>) => {
+    const newContract: Contract = {
+      ...contract,
+      id: `contract_${Date.now()}`,
+      contractCode: `HĐ-${new Date().getFullYear()}/${contract.roomNumber.replace(/\s+/g, '')}`,
+      signedAt: new Date().toLocaleString('vi-VN'),
+    };
+    setContracts((prev) => [newContract, ...prev]);
+  };
+
+  const deleteContract = (contractId: string) => {
+    setContracts((prev) => prev.filter((c) => c.id !== contractId));
+  };
+
   // 2. Landlord approves join request
   const approveJoinRequest = (requestId: string, targetRoomId: string) => {
     const req = joinRequests.find((r) => r.id === requestId);
     if (!req) return;
 
-    const targetRoom = rooms.find((r) => r.id === targetRoomId);
-    if (!targetRoom) return;
+    let targetRoom = rooms.find(
+      (r) => r.id === targetRoomId || r.roomNumber === targetRoomId || r.roomNumber === `Phòng ${targetRoomId}`
+    );
+
+    // Guard: Do not allow assigning a room if it is already occupied by another tenant
+    if (targetRoom && targetRoom.status === 'occupied' && targetRoom.currentTenantId && targetRoom.currentTenantId !== req.tenantId) {
+      alert(`Phòng ${targetRoom.roomNumber} hiện đã có người ở (${targetRoom.currentTenantName || 'Khách thuê'}). Không thể cho thuê phòng trùng!`);
+      return;
+    }
+
+    // If specified room does not exist in state, dynamically create it!
+    if (!targetRoom) {
+      const displayNum = targetRoomId.startsWith('Phòng')
+        ? targetRoomId
+        : `Phòng ${targetRoomId.replace(/^room_/, '')}`;
+
+      targetRoom = {
+        id: `room_${Date.now()}`,
+        landlordId: settings.landlordId || currentUser.id,
+        roomNumber: displayNum.trim() || 'Phòng 101',
+        floor: 1,
+        areaM2: 25,
+        basePrice: 2500000,
+        amenities: ['Điều hòa', 'Wifi'],
+        status: 'occupied',
+        doorLockState: 'locked',
+        doorPasscode: '123456',
+        securityStatus: 'secure',
+        electricityMeterStart: 100,
+        waterMeterStart: 30,
+        currentTenantId: req.tenantId,
+        currentTenantName: req.tenantName,
+      };
+
+      setRooms((prev) => [...prev, targetRoom!]);
+    } else {
+      // Update existing Room occupancy
+      setRooms((prev) =>
+        prev.map((rm) =>
+          rm.id === targetRoom!.id
+            ? {
+                ...rm,
+                status: 'occupied',
+                currentTenantId: req.tenantId,
+                currentTenantName: req.tenantName,
+              }
+            : rm
+        )
+      );
+    }
 
     // Update request status
     setJoinRequests((prev) =>
@@ -778,28 +875,15 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           ? {
               ...u,
               status: 'active',
-              landlordId: settings.landlordId,
-              roomId: targetRoom.id,
+              landlordId: settings.landlordId || currentUser.id,
+              roomId: targetRoom!.id,
             }
           : u
       )
     );
 
-    // Update Room occupancy
-    setRooms((prev) =>
-      prev.map((rm) =>
-        rm.id === targetRoom.id
-          ? {
-              ...rm,
-              status: 'occupied',
-              currentTenantId: req.tenantId,
-              currentTenantName: req.tenantName,
-            }
-          : rm
-      )
-    );
-
-    // Create Contract
+    // Create Contract with dynamic Landlord Name
+    const landlordDisplayName = getLandlordName();
     const newContract: Contract = {
       id: `contract_${Date.now()}`,
       contractCode: `HĐ-${new Date().getFullYear()}/${targetRoom.roomNumber.replace(/\s+/g, '')}`,
@@ -807,8 +891,8 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       tenantName: req.tenantName,
       tenantPhone: req.tenantPhone,
       tenantIdCard: req.tenantIdCard,
-      landlordId: settings.landlordId,
-      landlordName: 'Nguyễn Văn Hùng',
+      landlordId: settings.landlordId || currentUser.id,
+      landlordName: landlordDisplayName,
       roomId: targetRoom.id,
       roomNumber: targetRoom.roomNumber,
       startDate: new Date().toISOString().split('T')[0],
@@ -870,7 +954,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const welcomeNotif: AppNotification = {
       id: `notif_${Date.now()}`,
       senderId: settings.landlordId,
-      senderName: 'Chủ trọ Nguyễn Văn Hùng',
+      senderName: `Chủ trọ ${landlordDisplayName}`,
       receiverId: req.tenantId,
       landlordId: settings.landlordId,
       type: 'general',
@@ -1132,7 +1216,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         const notif: AppNotification = {
           id: `notif_${Date.now()}_${rm.id}`,
           senderId: settings.landlordId,
-          senderName: 'Chủ trọ Nguyễn Văn Hùng',
+          senderName: `Chủ trọ ${getLandlordName()}`,
           receiverId: tenant.id,
           landlordId: settings.landlordId,
           type: 'invoice_ready',
@@ -1512,7 +1596,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const notif: AppNotification = {
         id: `notif_${Date.now()}`,
         senderId: settings.landlordId,
-        senderName: 'Chủ trọ Nguyễn Văn Hùng',
+        senderName: `Chủ trọ ${getLandlordName()}`,
         receiverId: issue.tenantId,
         landlordId: settings.landlordId,
         type: 'maintenance',
@@ -1677,6 +1761,9 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         deleteRoom,
         updatePricing,
         broadcastNotice,
+        updateContract,
+        createContractCustom,
+        deleteContract,
         createManualInvoice,
         generateAIInvoicesBatch,
         payInvoice,
