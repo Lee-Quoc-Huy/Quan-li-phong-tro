@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useRental } from '../context/RentalContext';
+import { AppLogo } from './Common/AppLogo';
 import { UserRole } from '../types';
 import { 
   Home, 
@@ -138,8 +139,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Top: Brand Header */}
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center text-white font-black text-xl shadow-xs">
-              Q
+            <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200/80 flex items-center justify-center p-1.5 text-blue-600 shadow-xs">
+              <AppLogo className="w-full h-full" color="#2563eb" />
             </div>
             <div>
               <div className="font-bold text-slate-900 text-sm leading-tight uppercase">

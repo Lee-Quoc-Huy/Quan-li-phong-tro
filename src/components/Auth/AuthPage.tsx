@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useRental } from '../../context/RentalContext';
+import { AppLogo } from '../Common/AppLogo';
 import { UserRole } from '../../types';
 import { 
   Building2, 
@@ -107,10 +108,8 @@ export const AuthPage: React.FC = () => {
       
       {/* Brand Header */}
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3 mb-6">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-600 via-amber-500 to-amber-300 p-0.5 shadow-xl shadow-amber-950/50">
-          <div className="w-full h-full bg-[#0b0f17] rounded-[14px] flex items-center justify-center text-amber-400">
-            <Building2 className="w-7 h-7 text-amber-400" />
-          </div>
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900 border border-slate-700/80 p-2 shadow-2xl shadow-blue-950/60">
+          <AppLogo className="w-full h-full" color="#60a5fa" />
         </div>
         
         <div>

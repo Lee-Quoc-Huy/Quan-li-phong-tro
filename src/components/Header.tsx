@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useRental } from '../context/RentalContext';
+import { AppLogo } from './Common/AppLogo';
 import { UserRole } from '../types';
 import { 
   Building, 
@@ -50,10 +51,8 @@ export const Header: React.FC = () => {
             
             {/* Logo and Project Title */}
             <div className="flex items-center gap-3 shrink-0">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-500 to-amber-300 p-0.5 shadow-lg shadow-amber-950/40">
-                <div className="w-full h-full bg-[#0b0f17] rounded-[10px] flex items-center justify-center text-amber-400">
-                  <Building className="w-5 h-5" />
-                </div>
+              <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700/80 p-1.5 flex items-center justify-center text-blue-400 shadow-lg shadow-blue-950/40">
+                <AppLogo className="w-full h-full" color="#60a5fa" />
               </div>
               <div>
                 <div className="flex items-center gap-2">

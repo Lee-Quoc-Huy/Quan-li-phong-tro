@@ -1,6 +1,7 @@
 import React from 'react';
 import { useRental } from '../context/RentalContext';
-import { Menu, Bell, Building2, User, LogOut } from 'lucide-react';
+import { AppLogo } from './Common/AppLogo';
+import { Menu, Bell, User, LogOut } from 'lucide-react';
 
 interface MobileHeaderProps {
   onToggleSidebar: () => void;
@@ -25,8 +26,8 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
         </button>
 
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center text-white font-black text-sm">
-            T
+          <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 p-1 flex items-center justify-center text-blue-600">
+            <AppLogo className="w-full h-full" color="#2563eb" />
           </div>
           <div>
             <div className="font-bold text-slate-900 text-sm leading-tight">
