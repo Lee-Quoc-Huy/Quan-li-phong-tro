@@ -11,7 +11,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   onToggleSidebar,
   onOpenNotifications,
 }) => {
-  const { currentUser, settings, unreadNotifsCount, logout } = useRental();
+  const { currentUser, settings, joinRequests, unreadNotifsCount, logout } = useRental();
 
   return (
     <header className="sticky top-0 z-30 w-full bg-white border-b border-slate-200/90 px-4 py-3 flex items-center justify-between lg:hidden shadow-xs">
@@ -33,7 +33,9 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
               Quản lí nhà trọ
             </div>
             <div className="text-[10px] text-slate-500 font-medium truncate max-w-[140px]">
-              {settings.houseName}
+              {currentUser.role === 'tenant' && !currentUser.landlordId && !joinRequests.some((r) => r.tenantId === currentUser.id)
+                ? 'Chưa kết nối trọ'
+                : settings.houseName}
             </div>
           </div>
         </div>

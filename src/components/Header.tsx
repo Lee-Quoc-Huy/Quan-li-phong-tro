@@ -26,6 +26,7 @@ export const Header: React.FC = () => {
     switchUserById, 
     switchRoleQuick, 
     settings, 
+    joinRequests,
     unreadNotifsCount,
     resetAllData 
   } = useRental();
@@ -64,7 +65,9 @@ export const Header: React.FC = () => {
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-400 font-medium">
-                  {settings.houseName}
+                  {currentUser.role === 'tenant' && !currentUser.landlordId && !joinRequests.some((r) => r.tenantId === currentUser.id)
+                    ? 'Chưa kết nối trọ'
+                    : settings.houseName}
                 </div>
               </div>
             </div>
