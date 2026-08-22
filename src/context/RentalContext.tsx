@@ -175,7 +175,19 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_current_user`);
-    return saved ? JSON.parse(saved) : DEFAULT_EMPTY_USER;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Ensure brand new tenant accounts don't retain pre-assigned rooms
+        if (parsed.role === 'tenant' && parsed.roomId === 'room_101') {
+          return DEFAULT_EMPTY_USER;
+        }
+        return parsed;
+      } catch {
+        return DEFAULT_EMPTY_USER;
+      }
+    }
+    return DEFAULT_EMPTY_USER;
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
