@@ -13,9 +13,11 @@ import {
   Copy, 
   Check, 
   AlertTriangle,
-  Sparkles
+  Sparkles,
+  UserCog
 } from 'lucide-react';
 import { NotificationDrawer } from './Common/NotificationDrawer';
+import { UserProfileModal } from './Common/UserProfileModal';
 
 export const Header: React.FC = () => {
   const { 
@@ -30,6 +32,7 @@ export const Header: React.FC = () => {
 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
   const handleCopyHostCode = () => {
@@ -163,10 +166,22 @@ export const Header: React.FC = () => {
                 {/* Dropdown Menu */}
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-72 bg-[#0e1422] border border-slate-800 rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="p-3 border-b border-slate-800 mb-1 bg-slate-900/50 rounded-xl">
-                      <div className="text-xs font-bold text-slate-200">{currentUser.name}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">{currentUser.email}</div>
-                      <div className="text-[11px] text-slate-400">SĐT: {currentUser.phone}</div>
+                    <div className="p-3 border-b border-slate-800 mb-1 bg-slate-900/50 rounded-xl flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-bold text-slate-200">{currentUser.name} {currentUser.age ? `(${currentUser.age} tuổi)` : ''}</div>
+                        <div className="text-[11px] text-slate-400 font-mono">{currentUser.email}</div>
+                        <div className="text-[11px] text-slate-400">SĐT: {currentUser.phone}</div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsProfileModalOpen(true);
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-[11px] font-bold flex items-center gap-1 transition-colors border border-amber-500/30 shrink-0"
+                        title="Cập nhật hồ sơ cá nhân"
+                      >
+                        <UserCog className="w-3.5 h-3.5" /> Sửa Hồ Sơ
+                      </button>
                     </div>
 
                     {/* Quick Switch Profiles */}
@@ -257,6 +272,7 @@ export const Header: React.FC = () => {
 
       {/* Drawer */}
       <NotificationDrawer isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} />
+      <UserProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} />
     </>
   );
 };

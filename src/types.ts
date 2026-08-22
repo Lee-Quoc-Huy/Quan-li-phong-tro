@@ -7,6 +7,7 @@ export interface User {
   phone: string;
   role: UserRole;
   avatar: string;
+  age?: number;
   idCard?: string; // CCCD
   hometown?: string;
   status: 'active' | 'locked' | 'pending_approval';

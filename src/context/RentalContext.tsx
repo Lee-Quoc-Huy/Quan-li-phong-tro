@@ -145,6 +145,7 @@ interface RentalContextType {
   submitComplaint: (type: ComplaintReport['type'], title: string, content: string) => void;
   resolveComplaint: (complaintId: string, response: string) => void;
   issueLicense: (landlordId: string, plan: SystemLicense['plan'], maxRooms: number) => void;
+  updateUserProfile: (updates: Partial<User>) => void;
   
   // Reset demo data
   resetAllData: () => void;
@@ -1596,6 +1597,14 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setLicenses((prev) => [newLic, ...prev]);
   };
 
+  const updateUserProfile = (updates: Partial<User>) => {
+    setCurrentUser((prev) => {
+      const updated = { ...prev, ...updates };
+      setUsers((uList) => uList.map((u) => (u.id === prev.id ? updated : u)));
+      return updated;
+    });
+  };
+
   // Reset to initial clean state
   const resetAllData = () => {
     localStorage.clear();
@@ -1675,6 +1684,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         submitComplaint,
         resolveComplaint,
         issueLicense,
+        updateUserProfile,
         resetAllData,
       }}
     >

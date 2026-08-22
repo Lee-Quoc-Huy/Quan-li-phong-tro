@@ -27,6 +27,7 @@ import { LandlordIssues } from './components/RoleLandlord/LandlordIssues';
 // Admin Component
 import { AdminDashboard } from './components/RoleAdmin/AdminDashboard';
 import { AuthPage } from './components/Auth/AuthPage';
+import { UserProfileSettings } from './components/Common/UserProfileSettings';
 
 const MainApp: React.FC = () => {
   const { currentUser, settings, isAuthenticated } = useRental();
@@ -40,6 +41,10 @@ const MainApp: React.FC = () => {
 
   // Render role view contents
   const renderContent = () => {
+    if (activeTab === 'profile') {
+      return <UserProfileSettings />;
+    }
+
     if (currentUser.role === 'admin') {
       return <AdminDashboard />;
     }
@@ -118,17 +123,7 @@ const MainApp: React.FC = () => {
           {renderContent()}
         </main>
 
-        {/* Minimal Clean Footer */}
-        <footer className="w-full border-t border-slate-200/80 bg-white py-4 px-6 text-center text-xs text-slate-400">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-            <div>
-              <strong>Quản lí nhà trọ</strong> • Hệ thống Quản lý dãy trọ thông minh & Khóa IoT
-            </div>
-            <div className="text-[11px] text-slate-400">
-              Đồ án Môn học: Phân tích & Thiết kế Hệ thống
-            </div>
-          </div>
-        </footer>
+
 
       </div>
 

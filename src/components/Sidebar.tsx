@@ -22,7 +22,8 @@ import {
   Key,
   RotateCcw,
   Sparkles,
-  Bell
+  Bell,
+  UserCog
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -85,6 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'issues', label: 'Sự cố', icon: Wrench, badge: activeIssuesCount > 0 ? activeIssuesCount : null },
     { id: 'security', label: 'An ninh', icon: ShieldCheck },
     { id: 'pricing', label: 'Giá & Thông báo', icon: Tag },
+    { id: 'profile', label: 'Cài đặt hồ sơ', icon: UserCog },
   ];
 
   // Tenant Navigation Links
@@ -96,11 +98,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'security', label: 'Khóa cửa & Mã PIN', icon: ShieldCheck },
     { id: 'issues', label: 'Báo sự cố hư hỏng', icon: Wrench },
     { id: 'join', label: 'Nhập mã chủ trọ', icon: KeyRound },
+    { id: 'profile', label: 'Cài đặt hồ sơ', icon: UserCog },
   ];
 
   // Admin Navigation Links
   const adminLinks: SidebarLink[] = [
     { id: 'dashboard', label: 'Quản trị hệ thống', icon: Shield },
+    { id: 'profile', label: 'Cài đặt hồ sơ', icon: UserCog },
   ];
 
   const currentLinks: SidebarLink[] = 

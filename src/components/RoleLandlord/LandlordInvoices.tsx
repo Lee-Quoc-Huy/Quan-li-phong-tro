@@ -54,44 +54,20 @@ export const LandlordInvoices: React.FC = () => {
     e.preventDefault();
 
     if (targetType === 'single') {
-      const room = rooms.find((r) => r.id === selectedRoomId) || rooms[0];
-      const tenant = users.find((u) => u.id === room.currentTenantId) || users[0];
-
       createManualInvoice({
-        roomId: room.id,
-        roomNumber: room.roomNumber,
-        tenantId: tenant.id,
-        tenantName: tenant.name,
+        roomId: selectedRoomId,
         monthYear,
-        rentAmount: room.basePrice,
-        electricityStart: Number(elecStart),
-        electricityEnd: Number(elecEnd),
-        waterStart: Number(waterStart),
-        waterEnd: Number(waterEnd),
-        extraFee: Number(customExtraFee),
-        extraFeeReason: customExtraFeeReason,
-        isRentPrepaid: false,
-        aiGenerated: false,
+        extraFee: Number(customExtraFee) || 0,
+        extraFeeReason: customExtraFeeReason.trim(),
+        applyToAllRooms: false,
       });
     } else {
-      rooms.filter((r) => r.status === 'occupied').forEach((room) => {
-        const tenant = users.find((u) => u.id === room.currentTenantId) || users[0];
-        createManualInvoice({
-          roomId: room.id,
-          roomNumber: room.roomNumber,
-          tenantId: tenant.id,
-          tenantName: tenant.name,
-          monthYear,
-          rentAmount: room.basePrice,
-          electricityStart: room.electricityMeterStart,
-          electricityEnd: room.electricityMeterStart + 120,
-          waterStart: room.waterMeterStart,
-          waterEnd: room.waterMeterStart + 15,
-          extraFee: Number(customExtraFee),
-          extraFeeReason: customExtraFeeReason,
-          isRentPrepaid: false,
-          aiGenerated: false,
-        });
+      createManualInvoice({
+        roomId: rooms[0]?.id || '',
+        monthYear,
+        extraFee: Number(customExtraFee) || 0,
+        extraFeeReason: customExtraFeeReason.trim(),
+        applyToAllRooms: true,
       });
     }
 
@@ -359,6 +335,40 @@ export const LandlordInvoices: React.FC = () => {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Chi phí phát sinh (nếu có) */}
+              <div className="p-3 bg-amber-50/50 border border-amber-200/60 rounded-xl space-y-2">
+                <label className="text-amber-900 font-bold flex items-center gap-1.5">
+                  ⚡ Khoản phát sinh thêm (nếu có)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <span className="text-[11px] text-slate-600 font-semibold">Lý do phát sinh:</span>
+                    <input
+                      type="text"
+                      value={customExtraFeeReason}
+                      onChange={(e) => setCustomExtraFeeReason(e.target.value)}
+                      placeholder="VD: Sửa ống nước, Thay khóa, Gửi xe thêm..."
+                      className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[11px] text-slate-600 font-semibold">Số tiền (VNĐ):</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={10000}
+                      value={customExtraFee}
+                      onChange={(e) => setCustomExtraFee(Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 text-xs font-mono font-bold text-amber-700"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-amber-700 italic">
+                  * Khi bấm tạo, hệ thống sẽ lập hóa đơn kèm khoản phát sinh này và <strong>gửi thông báo kèm VietQR liền tức thì</strong> cho khách (hoặc toàn dãy nếu chọn tất cả).
+                </p>
               </div>
 
               <div className="pt-2 flex gap-2">
