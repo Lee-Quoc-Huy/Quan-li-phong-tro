@@ -157,6 +157,7 @@ interface RentalContextType {
   getFeatureFlagsForLandlord: (landlordId?: string) => SystemFeatureFlags;
   toggleUserLock: (userId: string) => void;
   deleteUser: (userId: string) => void;
+  deleteAllNonAdminUsers: () => void;
   submitComplaint: (type: ComplaintReport['type'], title: string, content: string) => void;
   resolveComplaint: (complaintId: string, response: string) => void;
   issueLicense: (landlordId: string, plan: SystemLicense['plan'], maxRooms: number) => void;
@@ -1935,6 +1936,34 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setUsers((prev) => prev.filter((u) => u.id !== userId));
   };
 
+  const deleteAllNonAdminUsers = () => {
+    users.forEach((u) => {
+      if (u.role !== 'admin' && u.id !== 'admin_root') {
+        deleteUserFromFirestore(u.id);
+      }
+    });
+
+    joinRequests.forEach((j) => {
+      deleteDoc(doc(db, 'joinRequests', j.id)).catch(() => {});
+    });
+
+    setRooms((prev) =>
+      prev.map((r) => ({
+        ...r,
+        currentTenantId: undefined,
+        status: 'available',
+      }))
+    );
+
+    const adminOnlyUsers = users.filter((u) => u.role === 'admin' || u.id === 'admin_root');
+    const finalUsers = adminOnlyUsers.length > 0 ? adminOnlyUsers : [ADMIN_USER];
+
+    setUsers(finalUsers);
+    setJoinRequests([]);
+    localStorage.setItem(`${STORAGE_KEY}_users`, JSON.stringify(finalUsers));
+    localStorage.setItem(`${STORAGE_KEY}_join_requests`, JSON.stringify([]));
+  };
+
   const submitComplaint = (type: ComplaintReport['type'], title: string, content: string) => {
     const newComp: ComplaintReport = {
       id: `comp_${Date.now()}`,
@@ -2139,6 +2168,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         getFeatureFlagsForLandlord,
         toggleUserLock,
         deleteUser,
+        deleteAllNonAdminUsers,
         submitComplaint,
         resolveComplaint,
         issueLicense,

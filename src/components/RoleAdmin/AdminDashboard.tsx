@@ -53,6 +53,7 @@ export const AdminDashboard: React.FC = () => {
     dismissEmergencyAlarm,
     toggleUserLock,
     deleteUser,
+    deleteAllNonAdminUsers,
     resolveComplaint,
     resetAllData 
   } = useRental();
@@ -574,13 +575,30 @@ export const AdminDashboard: React.FC = () => {
               </p>
             </div>
 
-            <input
-              type="text"
-              placeholder="Tìm theo tên, SĐT, CCCD, Mã dãy trọ..."
-              value={searchUser}
-              onChange={(e) => setSearchUser(e.target.value)}
-              className="px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500 w-full sm:w-72"
-            />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <input
+                type="text"
+                placeholder="Tìm theo tên, SĐT, CCCD, Mã dãy trọ..."
+                value={searchUser}
+                onChange={(e) => setSearchUser(e.target.value)}
+                className="px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500 w-full sm:w-64"
+              />
+
+              <button
+                onClick={() => {
+                  if (window.confirm('CẢNH BÁO QUAN TRỌNG:\n\nBạn có chắc chắn muốn XÓA TẤT CẢ các tài khoản (Chủ trọ, Khách thuê) trong hệ thống không?\n\nChỉ duy nhất tài khoản Quản Trị Viên (Admin) sẽ được giữ lại. Mọi dữ liệu phòng trọ và tài khoản liên quan sẽ bị xóa sạch.')) {
+                    deleteAllNonAdminUsers();
+                    setStatusMessage('Đã xóa toàn bộ tất cả tài khoản thành công! Chỉ giữ lại tài khoản Admin.');
+                    setTimeout(() => setStatusMessage(null), 4000);
+                  }
+                }}
+                className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs shrink-0"
+                title="Xóa sạch mọi tài khoản trừ Admin"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Xóa Tất Cả (Trừ Admin)</span>
+              </button>
+            </div>
           </div>
 
           {/* GROUP 1: ROOT ADMIN */}
