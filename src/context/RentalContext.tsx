@@ -410,8 +410,22 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setUsers(fetched);
         setCurrentUser((curr) => {
           if (!curr || !curr.id) return curr;
+          if (curr.role === 'admin' || curr.id === 'admin_root') {
+            const match = fetched.find((u) => u.id === curr.id);
+            return match ? { ...curr, ...match } : curr;
+          }
           const match = fetched.find((u) => u.id === curr.id);
-          return match ? { ...curr, ...match } : curr;
+          if (!match) {
+            // Tài khoản đã bị Admin xóa hoàn toàn khỏi hệ thống -> Lập tức đăng xuất
+            setIsAuthenticated(false);
+            localStorage.removeItem(`${STORAGE_KEY}_current_user`);
+            localStorage.setItem(`${STORAGE_KEY}_is_authenticated`, 'false');
+            setTimeout(() => {
+              window.alert('Tài khoản của bạn đã bị Quản trị viên xóa khỏi hệ thống. Phiên đăng nhập đã kết thúc.');
+            }, 100);
+            return DEFAULT_EMPTY_USER;
+          }
+          return { ...curr, ...match };
         });
       }
     }, (err) => console.error('Firestore users listener error:', err));
@@ -908,7 +922,26 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const logout = () => {
     setIsAuthenticated(false);
+    setCurrentUser(DEFAULT_EMPTY_USER);
+    localStorage.removeItem(`${STORAGE_KEY}_current_user`);
+    localStorage.setItem(`${STORAGE_KEY}_is_authenticated`, 'false');
   };
+
+  // Watcher: Tự động ngắt phiên đăng nhập nếu tài khoản người dùng bị Admin xóa khỏi hệ thống
+  useEffect(() => {
+    if (isAuthenticated && currentUser.id && currentUser.role !== 'admin' && currentUser.id !== 'admin_root') {
+      if (users.length > 0) {
+        const stillExists = users.some((u) => u.id === currentUser.id);
+        if (!stillExists) {
+          setIsAuthenticated(false);
+          setCurrentUser(DEFAULT_EMPTY_USER);
+          localStorage.removeItem(`${STORAGE_KEY}_current_user`);
+          localStorage.setItem(`${STORAGE_KEY}_is_authenticated`, 'false');
+          window.alert('Tài khoản của bạn đã bị Quản trị viên xóa khỏi hệ thống. Bạn đã bị đăng xuất.');
+        }
+      }
+    }
+  }, [users, currentUser.id, currentUser.role, isAuthenticated]);
 
   const switchUserById = (userId: string) => {
     const found = users.find((u) => u.id === userId);
@@ -2198,18 +2231,142 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const deleteUser = (userId: string) => {
     if (userId === 'admin_root') return;
+
+    const targetUser = users.find((u) => u.id === userId);
+
+    // 1. Delete user from Firestore
     deleteUserFromFirestore(userId);
     setUsers((prev) => prev.filter((u) => u.id !== userId));
 
-    // Delete rooms that belonged to deleted landlord, or remove tenant from room
-    setRooms((prev) => {
-      const remaining = prev.filter((r) => r.landlordId !== userId);
-      return remaining.map((r) =>
-        r.currentTenantId === userId
-          ? { ...r, currentTenantId: undefined, currentTenantName: undefined, status: 'available' }
-          : r
+    // 2. If the deleted user is the current active session, kick out immediately
+    if (currentUser.id === userId) {
+      setIsAuthenticated(false);
+      setCurrentUser(DEFAULT_EMPTY_USER);
+      localStorage.removeItem(`${STORAGE_KEY}_current_user`);
+      localStorage.setItem(`${STORAGE_KEY}_is_authenticated`, 'false');
+    }
+
+    // 3. Complete cleanup if user is a Landlord
+    if (!targetUser || targetUser.role === 'landlord') {
+      // Clean up landlord settings & features
+      deleteDoc(doc(db, 'settings', userId)).catch(() => {});
+      deleteDoc(doc(db, 'features', userId)).catch(() => {});
+      localStorage.removeItem(`${STORAGE_KEY}_settings_${userId}`);
+      localStorage.removeItem(`${STORAGE_KEY}_features_${userId}`);
+
+      // Delete all rooms owned by this landlord
+      rooms.filter((r) => r.landlordId === userId).forEach((r) => {
+        deleteDoc(doc(db, 'rooms', r.id)).catch(() => {});
+      });
+      setRooms((prev) => prev.filter((r) => r.landlordId !== userId));
+
+      // Delete all contracts of this landlord
+      contracts.filter((c) => c.landlordId === userId).forEach((c) => {
+        deleteDoc(doc(db, 'contracts', c.id)).catch(() => {});
+      });
+      setContracts((prev) => prev.filter((c) => c.landlordId !== userId));
+
+      // Delete all invoices of this landlord
+      invoices.filter((inv) => inv.landlordId === userId).forEach((inv) => {
+        deleteDoc(doc(db, 'invoices', inv.id)).catch(() => {});
+      });
+      setInvoices((prev) => prev.filter((inv) => inv.landlordId !== userId));
+
+      // Delete all issues of this landlord
+      issues.filter((issue) => issue.landlordId === userId).forEach((issue) => {
+        deleteDoc(doc(db, 'issues', issue.id)).catch(() => {});
+      });
+      setIssues((prev) => prev.filter((issue) => issue.landlordId !== userId));
+
+      // Delete all join requests of this landlord
+      joinRequests.filter((j) => j.landlordId === userId).forEach((j) => {
+        deleteDoc(doc(db, 'joinRequests', j.id)).catch(() => {});
+      });
+      setJoinRequests((prev) => prev.filter((j) => j.landlordId !== userId));
+
+      // Delete all notifications belonging to this landlord
+      notifications.filter((n) => n.landlordId === userId || n.senderId === userId || n.receiverId === userId).forEach((n) => {
+        deleteDoc(doc(db, 'notifications', n.id)).catch(() => {});
+      });
+      setNotifications((prev) => prev.filter((n) => n.landlordId !== userId && n.senderId !== userId && n.receiverId !== userId));
+
+      // Delete all security logs of this landlord
+      securityLogs.filter((s) => s.landlordId === userId).forEach((s) => {
+        deleteDoc(doc(db, 'securityLogs', s.id)).catch(() => {});
+      });
+      setSecurityLogs((prev) => prev.filter((s) => s.landlordId !== userId));
+
+      // Unassign any tenants linked to this landlord
+      setUsers((prev) =>
+        prev.map((u) => {
+          if (u.landlordId === userId) {
+            const updated = { ...u, landlordId: undefined, roomId: undefined, roomName: undefined };
+            saveUserToFirestore(updated);
+            return updated;
+          }
+          return u;
+        })
       );
-    });
+    }
+
+    // 4. Complete cleanup if user is a Tenant
+    if (!targetUser || targetUser.role === 'tenant') {
+      const userPhone = targetUser?.phone;
+
+      // Free up any rooms occupied by this tenant
+      setRooms((prev) =>
+        prev.map((r) => {
+          if (r.currentTenantId === userId || (userPhone && r.currentTenantPhone === userPhone)) {
+            const updated: Room = {
+              ...r,
+              currentTenantId: undefined,
+              currentTenantName: undefined,
+              currentTenantPhone: undefined,
+              status: 'available',
+            };
+            saveRoomToFirestore(updated);
+            return updated;
+          }
+          return r;
+        })
+      );
+
+      // Delete all contracts of this tenant
+      contracts.filter((c) => c.tenantId === userId || (userPhone && c.tenantPhone === userPhone)).forEach((c) => {
+        deleteDoc(doc(db, 'contracts', c.id)).catch(() => {});
+      });
+      setContracts((prev) => prev.filter((c) => c.tenantId !== userId && (!userPhone || c.tenantPhone !== userPhone)));
+
+      // Delete all invoices of this tenant
+      invoices.filter((inv) => inv.tenantId === userId).forEach((inv) => {
+        deleteDoc(doc(db, 'invoices', inv.id)).catch(() => {});
+      });
+      setInvoices((prev) => prev.filter((inv) => inv.tenantId !== userId));
+
+      // Delete all issues created by this tenant
+      issues.filter((issue) => issue.tenantId === userId).forEach((issue) => {
+        deleteDoc(doc(db, 'issues', issue.id)).catch(() => {});
+      });
+      setIssues((prev) => prev.filter((issue) => issue.tenantId !== userId));
+
+      // Delete all join requests by this tenant
+      joinRequests.filter((j) => j.tenantId === userId).forEach((j) => {
+        deleteDoc(doc(db, 'joinRequests', j.id)).catch(() => {});
+      });
+      setJoinRequests((prev) => prev.filter((j) => j.tenantId !== userId));
+
+      // Delete all notifications for/from this tenant
+      notifications.filter((n) => n.receiverId === userId || n.senderId === userId).forEach((n) => {
+        deleteDoc(doc(db, 'notifications', n.id)).catch(() => {});
+      });
+      setNotifications((prev) => prev.filter((n) => n.receiverId !== userId && n.senderId !== userId));
+
+      // Delete all complaints created by this tenant
+      complaints.filter((cp) => cp.tenantId === userId).forEach((cp) => {
+        deleteDoc(doc(db, 'complaints', cp.id)).catch(() => {});
+      });
+      setComplaints((prev) => prev.filter((cp) => cp.tenantId !== userId));
+    }
   };
 
   const deleteAllNonAdminUsers = () => {
