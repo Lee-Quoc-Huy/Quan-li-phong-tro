@@ -1104,13 +1104,16 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         };
       }
 
+      const jsonString = JSON.stringify(payload);
+
+      // Google Apps Script handles POST requests most reliably via text/plain to bypass CORS preflight
       await fetch(webhookUrl.trim(), {
         method: 'POST',
         mode: 'no-cors',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'text/plain;charset=utf-8',
         },
-        body: JSON.stringify(payload),
+        body: jsonString,
       });
 
       const nowTime = new Date().toLocaleString('vi-VN');
@@ -1128,7 +1131,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         message: action === 'ADD' || action === 'new_contract'
           ? `Đã đồng bộ thông tin khách ${tenantData?.name || tenantData?.tenantName || tenantData?.id} sang Google Sheet`
           : action === 'sync_all'
-          ? `Đã đồng bộ toàn bộ danh sách sang Google Sheet`
+          ? `Đã đồng bộ toàn bộ ${allTenantsData?.length || 0} khách sang Google Sheet!`
           : `Đã gửi lệnh xóa khách ${tenantData?.id} khỏi Google Sheet`,
       };
     } catch (error) {
@@ -1142,31 +1145,88 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Sync all active tenants to Google Sheet in batch
   const syncAllTenantsToGoogleSheet = async (): Promise<{ success: boolean; count: number; message: string }> => {
-    const activeTenants = users.filter((u) => u.role === 'tenant' && u.roomId);
-    if (activeTenants.length === 0) {
-      return { success: true, count: 0, message: 'Hiện không có khách thuê nào để đồng bộ' };
-    }
+    // 1. Gather tenants from active users
+    const tenantMap = new Map<string, {
+      roomNumber: string;
+      tenantName: string;
+      phone: string;
+      identityCard: string;
+      startDate: string;
+      endDate: string;
+      price: number;
+      deposit: number;
+      status: string;
+    }>();
 
-    const tenantsDataList = activeTenants.map((tenant) => {
-      const room = rooms.find((r) => r.id === tenant.roomId);
-      const contract = contracts.find((c) => c.roomId === tenant.roomId && c.status === 'active');
-      return {
-        roomNumber: room?.roomNumber || 'Phòng ?',
-        tenantName: tenant.name,
-        phone: tenant.phone,
-        identityCard: tenant.idCard || '',
-        startDate: contract?.startDate || new Date().toISOString().split('T')[0],
-        endDate: contract?.endDate || 'Vô thời hạn',
-        price: room?.basePrice || 3500000,
-        deposit: contract?.depositAmount || room?.basePrice || 3500000,
-        status: 'Đang thuê',
-      };
+    // From occupied rooms
+    rooms.forEach((r) => {
+      if (r.status === 'occupied' && (r.currentTenantName || r.currentTenantPhone || r.currentTenantId)) {
+        const key = r.currentTenantPhone || r.currentTenantId || r.roomNumber;
+        const matchingContract = contracts.find((c) => c.roomId === r.id && c.status === 'active');
+        const matchingUser = users.find((u) => u.id === r.currentTenantId || (r.currentTenantPhone && u.phone === r.currentTenantPhone));
+        tenantMap.set(key, {
+          roomNumber: r.roomNumber,
+          tenantName: r.currentTenantName || matchingUser?.name || matchingContract?.tenantName || 'Khách thuê',
+          phone: r.currentTenantPhone || matchingUser?.phone || matchingContract?.tenantPhone || '---',
+          identityCard: matchingUser?.idCard || matchingContract?.tenantIdCard || '---',
+          startDate: matchingContract?.startDate || new Date().toISOString().split('T')[0],
+          endDate: matchingContract?.endDate || 'Vô thời hạn',
+          price: matchingContract?.monthlyRent || r.basePrice || 3500000,
+          deposit: matchingContract?.depositAmount || r.basePrice || 3500000,
+          status: 'Đang thuê',
+        });
+      }
     });
 
-    // 1. Send batch payload (action: sync_all)
-    await syncToGoogleSheet('sync_all', undefined, tenantsDataList);
+    // From active contracts
+    contracts.forEach((c) => {
+      if (c.status === 'active') {
+        const key = c.tenantPhone || c.tenantId || c.roomNumber;
+        if (!tenantMap.has(key)) {
+          tenantMap.set(key, {
+            roomNumber: c.roomNumber,
+            tenantName: c.tenantName,
+            phone: c.tenantPhone || '---',
+            identityCard: c.tenantIdCard || '---',
+            startDate: c.startDate,
+            endDate: c.endDate || 'Vô thời hạn',
+            price: c.monthlyRent || 3500000,
+            deposit: c.depositAmount || 3500000,
+            status: 'Đang thuê',
+          });
+        }
+      }
+    });
 
-    // 2. Also send individual rows (action: ADD) for scripts that listen to single add actions
+    // From users with assigned roomId
+    users.filter((u) => u.role === 'tenant' && u.roomId).forEach((u) => {
+      const key = u.phone || u.id;
+      if (!tenantMap.has(key)) {
+        const room = rooms.find((r) => r.id === u.roomId);
+        tenantMap.set(key, {
+          roomNumber: room?.roomNumber || 'Phòng ?',
+          tenantName: u.name,
+          phone: u.phone,
+          identityCard: u.idCard || '---',
+          startDate: new Date().toISOString().split('T')[0],
+          endDate: 'Vô thời hạn',
+          price: room?.basePrice || 3500000,
+          deposit: room?.basePrice || 3500000,
+          status: 'Đang thuê',
+        });
+      }
+    });
+
+    const tenantsDataList = Array.from(tenantMap.values());
+
+    if (tenantsDataList.length === 0) {
+      return { success: true, count: 0, message: 'Hiện chưa có khách nào đang thuê phòng để đồng bộ.' };
+    }
+
+    // 1. Send batch payload (action: sync_all)
+    const result = await syncToGoogleSheet('sync_all', undefined, tenantsDataList);
+
+    // 2. Also send individual rows (action: ADD) for single-record scripts
     for (const item of tenantsDataList) {
       await syncToGoogleSheet('ADD', {
         id: item.phone,
@@ -1186,20 +1246,12 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       });
     }
 
-    const nowTime = new Date().toLocaleString('vi-VN');
-    const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
-    const updatedSettings = {
-      ...settings,
-      googleSheetLastSync: nowTime,
-    };
-    setSettings(updatedSettings);
-    localStorage.setItem(`${STORAGE_KEY}_settings_${targetLandlordId}`, JSON.stringify(updatedSettings));
-    saveSettingsToFirestore(updatedSettings);
-
     return {
-      success: true,
-      count: activeTenants.length,
-      message: `Đã đồng bộ thành công ${activeTenants.length} khách thuê sang Google Sheet!`,
+      success: result.success,
+      count: tenantsDataList.length,
+      message: result.success
+        ? `Đã đồng bộ thành công ${tenantsDataList.length} khách thuê sang Google Sheet!`
+        : result.message,
     };
   };
 

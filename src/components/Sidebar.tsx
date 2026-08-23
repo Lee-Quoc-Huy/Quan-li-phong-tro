@@ -45,9 +45,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { 
     currentUser, 
-    users, 
-    switchUserById, 
-    switchRoleQuick, 
     logout,
     settings, 
     currentHouseName,
@@ -55,11 +52,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     issues, 
     invoices, 
     unreadNotifsCount,
-    resetAllData,
     regenerateHostCode
   } = useRental();
 
-  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
   const pendingJoinCount = joinRequests.filter((r) => r.status === 'pending').length;
@@ -252,14 +247,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setIsRoleModalOpen(true)}
-                className="text-[11px] text-slate-600 hover:text-teal-700 font-medium hover:underline cursor-pointer"
-                title="Đổi tài khoản / vai trò"
-              >
-                Đổi TK
-              </button>
-              <span className="text-slate-300">•</span>
-              <button
                 onClick={() => {
                   if (window.confirm(`Bạn có chắc chắn muốn đăng xuất khỏi tài khoản ${currentUser.name}?`)) {
                     logout();
@@ -307,103 +294,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
       </aside>
-
-      {/* Role & Account Switcher Modal */}
-      {isRoleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl border border-slate-200 space-y-5">
-            
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="font-bold text-slate-900 text-base">Thông Tin Tài Khoản</h3>
-                <p className="text-xs text-slate-500">Quản lý phiên làm việc & chuyển đổi tài khoản</p>
-              </div>
-              <button
-                onClick={() => setIsRoleModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Current Active User Profile */}
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
-              <img src={currentUser.avatar} alt={currentUser.name} className="w-11 h-11 rounded-xl object-cover border border-slate-300" />
-              <div className="flex-1 min-w-0">
-                <div className="font-bold text-slate-900 text-sm truncate">{currentUser.name}</div>
-                <div className="text-xs text-slate-500">{currentUser.phone} • {currentUser.email}</div>
-                <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 uppercase">
-                  {currentUser.role === 'landlord' ? 'Chủ Nhà' : currentUser.role === 'tenant' ? 'Khách Thuê' : 'Quản Trị'}
-                </span>
-              </div>
-            </div>
-
-            {/* Registered Users List (if more than 1) */}
-            {users.length > 1 && (
-              <div className="space-y-2">
-                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Chuyển sang tài khoản khác:
-                </div>
-                <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
-                  {users.map((u) => (
-                    <button
-                      key={u.id}
-                      onClick={() => {
-                        switchUserById(u.id);
-                        setIsRoleModalOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-colors border ${
-                        u.id === currentUser.id
-                          ? 'bg-teal-50/80 border-teal-400 text-teal-950 font-bold'
-                          : 'bg-white border-slate-100 text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <img src={u.avatar} alt={u.name} className="w-7 h-7 rounded-lg object-cover border border-slate-200" />
-                        <div>
-                          <div className="text-xs font-bold">{u.name}</div>
-                          <div className="text-[10px] text-slate-400 font-normal">
-                            {u.role === 'tenant' ? 'Khách thuê' : u.role === 'landlord' ? 'Chủ trọ' : 'Admin'} • {u.phone}
-                          </div>
-                        </div>
-                      </div>
-                      {u.id === currentUser.id && <Check className="w-4 h-4 text-teal-600" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Actions: Logout and Clear Data Option */}
-            <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
-              <button
-                onClick={() => {
-                  setIsRoleModalOpen(false);
-                  logout();
-                }}
-                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 font-bold transition-colors border border-rose-200"
-              >
-                <LogOut className="w-4 h-4 text-rose-600" />
-                Đăng Xuất Khỏi Hệ Thống
-              </button>
-
-              <button
-                onClick={() => {
-                  if (window.confirm('Xóa sạch toàn bộ dữ liệu và đưa hệ thống về trạng thái ban đầu?')) {
-                    resetAllData();
-                    setIsRoleModalOpen(false);
-                  }
-                }}
-                className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-[11px] text-slate-400 hover:text-slate-700 hover:bg-slate-100 font-medium transition-colors"
-              >
-                <RotateCcw className="w-3 h-3" />
-                Xóa toàn bộ dữ liệu & Đặt lại
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
     </>
   );
 };

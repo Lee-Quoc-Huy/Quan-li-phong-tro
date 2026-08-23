@@ -1,22 +1,15 @@
 import React, { useState } from 'react';
 import { useRental } from '../context/RentalContext';
 import { AppLogo } from './Common/AppLogo';
-import { UserRole } from '../types';
 import { 
-  Building, 
-  Home, 
-  Shield, 
   Bell, 
   KeyRound, 
-  UserCheck, 
-  RotateCcw, 
   ChevronDown, 
   Copy, 
   Check, 
-  AlertTriangle,
-  Sparkles,
   UserCog,
-  RefreshCw
+  RefreshCw,
+  LogOut
 } from 'lucide-react';
 import { NotificationDrawer } from './Common/NotificationDrawer';
 import { UserProfileModal } from './Common/UserProfileModal';
@@ -24,14 +17,10 @@ import { UserProfileModal } from './Common/UserProfileModal';
 export const Header: React.FC = () => {
   const { 
     currentUser, 
-    users, 
-    switchUserById, 
-    switchRoleQuick, 
     settings, 
     currentHouseName,
-    joinRequests,
     unreadNotifsCount,
-    resetAllData,
+    logout,
     regenerateHostCode
   } = useRental();
 
@@ -89,45 +78,6 @@ export const Header: React.FC = () => {
               </div>
             </div>
 
-            {/* Middle Role Switcher Navigation */}
-            <div className="hidden lg:flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 shadow-inner">
-              <button
-                onClick={() => switchRoleQuick('tenant')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  currentUser.role === 'tenant'
-                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-900/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                }`}
-              >
-                <Home className="w-4 h-4" />
-                <span>Người Thuê Trọ</span>
-              </button>
-
-              <button
-                onClick={() => switchRoleQuick('landlord')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  currentUser.role === 'landlord'
-                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-900/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                }`}
-              >
-                <Building className="w-4 h-4" />
-                <span>Chủ Nhà Trọ</span>
-              </button>
-
-              <button
-                onClick={() => switchRoleQuick('admin')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  currentUser.role === 'admin'
-                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-900/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                }`}
-              >
-                <Shield className="w-4 h-4" />
-                <span>Quản Lý Hệ Thống</span>
-              </button>
-            </div>
-
             {/* Right Tools & Profile */}
             <div className="flex items-center gap-3">
               
@@ -175,11 +125,11 @@ export const Header: React.FC = () => {
                 )}
               </button>
 
-              {/* User Account Switcher Dropdown */}
+              {/* User Account Dropdown */}
               <div className="relative">
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center gap-2.5 p-1.5 pr-3 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition-all"
+                  className="flex items-center gap-2.5 p-1.5 pr-3 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
                 >
                   <img
                     src={currentUser.avatar}
@@ -200,69 +150,37 @@ export const Header: React.FC = () => {
                 {/* Dropdown Menu */}
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-72 bg-[#0e1422] border border-slate-800 rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="p-3 border-b border-slate-800 mb-1 bg-slate-900/50 rounded-xl flex items-center justify-between">
-                      <div>
-                        <div className="text-xs font-bold text-slate-200">{currentUser.name} {currentUser.age ? `(${currentUser.age} tuổi)` : ''}</div>
-                        <div className="text-[11px] text-slate-400 font-mono">{currentUser.email}</div>
-                        <div className="text-[11px] text-slate-400">SĐT: {currentUser.phone}</div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setIsProfileModalOpen(true);
-                          setIsUserMenuOpen(false);
-                        }}
-                        className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-[11px] font-bold flex items-center gap-1 transition-colors border border-amber-500/30 shrink-0"
-                        title="Cập nhật hồ sơ cá nhân"
-                      >
-                        <UserCog className="w-3.5 h-3.5" /> Sửa Hồ Sơ
-                      </button>
-                    </div>
-
-                    {/* Quick Switch Profiles */}
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 py-1.5">
-                      Chuyển đổi tài khoản làm việc:
-                    </div>
-                    <div className="space-y-1">
-                      {users.map((u) => (
+                    <div className="p-3 bg-slate-900/70 rounded-xl mb-2">
+                      <div className="text-xs font-bold text-slate-200">{currentUser.name} {currentUser.age ? `(${currentUser.age} tuổi)` : ''}</div>
+                      <div className="text-[11px] text-slate-400 font-mono">{currentUser.email}</div>
+                      <div className="text-[11px] text-slate-400">SĐT: {currentUser.phone}</div>
+                      <div className="mt-2 flex items-center gap-2">
                         <button
-                          key={u.id}
                           onClick={() => {
-                            switchUserById(u.id);
+                            setIsProfileModalOpen(true);
                             setIsUserMenuOpen(false);
                           }}
-                          className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-colors ${
-                            u.id === currentUser.id
-                              ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30'
-                              : 'text-slate-300 hover:bg-slate-800'
-                          }`}
+                          className="flex-1 px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-[11px] font-bold flex items-center justify-center gap-1 transition-colors border border-amber-500/30"
+                          title="Cập nhật hồ sơ cá nhân"
                         >
-                          <div className="flex items-center gap-2">
-                            <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-md object-cover" />
-                            <div>
-                              <div>{u.name}</div>
-                              <div className="text-[10px] text-slate-400">
-                                {u.role === 'tenant' ? 'Khách thuê' : u.role === 'landlord' ? 'Chủ trọ' : 'Admin'}
-                              </div>
-                            </div>
-                          </div>
-                          {u.id === currentUser.id && <UserCheck className="w-4 h-4 text-amber-400" />}
+                          <UserCog className="w-3.5 h-3.5" /> Sửa Hồ Sơ
                         </button>
-                      ))}
+                      </div>
                     </div>
 
-                    {/* Reset Data Button */}
-                    <div className="border-t border-slate-800 mt-2 pt-2">
+                    {/* Logout Button */}
+                    <div className="border-t border-slate-800 pt-2">
                       <button
                         onClick={() => {
-                          if (window.confirm('Khôi phục toàn bộ dữ liệu ban đầu? Dữ liệu bạn tạo sẽ được đặt lại.')) {
-                            resetAllData();
+                          if (window.confirm(`Bạn có chắc chắn muốn đăng xuất khỏi tài khoản ${currentUser.name}?`)) {
                             setIsUserMenuOpen(false);
+                            logout();
                           }
                         }}
-                        className="w-full flex items-center justify-center gap-2 p-2 rounded-xl text-xs text-rose-400 hover:bg-rose-950/40 transition-colors"
+                        className="w-full flex items-center justify-center gap-2 p-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
                       >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        Đặt lại dữ liệu ban đầu
+                        <LogOut className="w-3.5 h-3.5" />
+                        Đăng Xuất
                       </button>
                     </div>
 
@@ -273,34 +191,6 @@ export const Header: React.FC = () => {
             </div>
 
           </div>
-        </div>
-
-        {/* Mobile Sub Navigation bar for roles */}
-        <div className="lg:hidden flex items-center justify-around bg-slate-950/90 border-t border-slate-800/80 px-2 py-2">
-          <button
-            onClick={() => switchRoleQuick('tenant')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
-              currentUser.role === 'tenant' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
-            }`}
-          >
-            <Home className="w-3.5 h-3.5" /> Khách Thuê
-          </button>
-          <button
-            onClick={() => switchRoleQuick('landlord')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
-              currentUser.role === 'landlord' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
-            }`}
-          >
-            <Building className="w-3.5 h-3.5" /> Chủ Trọ
-          </button>
-          <button
-            onClick={() => switchRoleQuick('admin')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
-              currentUser.role === 'admin' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5" /> Quản Trị
-          </button>
         </div>
       </header>
 
