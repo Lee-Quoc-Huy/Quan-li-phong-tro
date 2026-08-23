@@ -214,7 +214,19 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   });
 
   const [settings, setSettings] = useState<LandlordSettings>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_settings`);
+    const savedUserStr = localStorage.getItem(`${STORAGE_KEY}_current_user`);
+    let targetLandlordId = 'main';
+    if (savedUserStr) {
+      try {
+        const u = JSON.parse(savedUserStr);
+        if (u.role === 'landlord') {
+          targetLandlordId = u.id;
+        } else if (u.role === 'tenant' && u.landlordId) {
+          targetLandlordId = u.landlordId;
+        }
+      } catch (e) {}
+    }
+    const saved = localStorage.getItem(`${STORAGE_KEY}_settings_${targetLandlordId}`) || localStorage.getItem(`${STORAGE_KEY}_settings`);
     return saved ? JSON.parse(saved) : INITIAL_LANDLORD_SETTINGS;
   });
 
@@ -287,8 +299,16 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     localStorage.setItem(`${STORAGE_KEY}_is_authenticated`, JSON.stringify(isAuthenticated));
   }, [isAuthenticated]);
   useEffect(() => {
+    if (!currentUser) return;
+    let targetLandlordId = 'main';
+    if (currentUser.role === 'landlord') {
+      targetLandlordId = currentUser.id;
+    } else if (currentUser.role === 'tenant' && currentUser.landlordId) {
+      targetLandlordId = currentUser.landlordId;
+    }
+    localStorage.setItem(`${STORAGE_KEY}_settings_${targetLandlordId}`, JSON.stringify(settings));
     localStorage.setItem(`${STORAGE_KEY}_settings`, JSON.stringify(settings));
-  }, [settings]);
+  }, [settings, currentUser]);
   useEffect(() => {
     localStorage.setItem(`${STORAGE_KEY}_rooms`, JSON.stringify(rooms));
   }, [rooms]);
@@ -355,7 +375,15 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     try { await setDoc(doc(db, 'joinRequests', req.id), sanitizeForFirestore(req), { merge: true }); } catch (err) { console.error('Firestore saveJoinRequest error:', err); }
   };
   const saveSettingsToFirestore = async (st: LandlordSettings) => {
-    try { await setDoc(doc(db, 'settings', 'main'), sanitizeForFirestore(st), { merge: true }); } catch (err) { console.error('Firestore saveSettings error:', err); }
+    let targetLandlordId = st.landlordId || 'main';
+    if (!targetLandlordId && currentUser) {
+      targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (currentUser.landlordId || 'main');
+    }
+    try {
+      await setDoc(doc(db, 'settings', targetLandlordId), sanitizeForFirestore(st), { merge: true });
+    } catch (err) {
+      console.error('Firestore saveSettings error:', err);
+    }
   };
   const saveTelemetryToFirestore = async (tel: Record<string, RealtimeTelemetry>) => {
     try { await setDoc(doc(db, 'telemetry', 'main'), sanitizeForFirestore(tel), { merge: true }); } catch (err) { console.error('Firestore saveTelemetry error:', err); }
@@ -467,14 +495,6 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
     }, (err) => console.error('Firestore securityLogs listener error:', err));
 
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'main'), (dSnap) => {
-      if (!dSnap.exists()) {
-        setDoc(doc(db, 'settings', 'main'), sanitizeForFirestore(INITIAL_LANDLORD_SETTINGS));
-      } else {
-        setSettings(dSnap.data() as LandlordSettings);
-      }
-    }, (err) => console.error('Firestore settings listener error:', err));
-
     const unsubTelemetry = onSnapshot(doc(db, 'telemetry', 'main'), (dSnap) => {
       if (!dSnap.exists()) {
         setDoc(doc(db, 'telemetry', 'main'), sanitizeForFirestore(INITIAL_TELEMETRY));
@@ -494,10 +514,58 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       unsubLicenses();
       unsubComplaints();
       unsubLogs();
-      unsubSettings();
       unsubTelemetry();
     };
   }, []);
+
+  // Dynamic settings subscription based on current user (splits settings for separate landlords)
+  useEffect(() => {
+    let targetLandlordId = 'main';
+    if (currentUser.role === 'landlord') {
+      targetLandlordId = currentUser.id;
+    } else if (currentUser.role === 'tenant' && currentUser.landlordId) {
+      targetLandlordId = currentUser.landlordId;
+    }
+
+    const cached = localStorage.getItem(`${STORAGE_KEY}_settings_${targetLandlordId}`);
+    if (cached) {
+      try {
+        setSettings(JSON.parse(cached));
+      } catch (e) {}
+    } else {
+      setSettings({
+        ...INITIAL_LANDLORD_SETTINGS,
+        landlordId: targetLandlordId === 'main' ? '' : targetLandlordId,
+        houseName: targetLandlordId === 'main' 
+          ? 'Dãy Trọ Của Tôi' 
+          : (currentUser.role === 'landlord' && currentUser.name 
+              ? `Dãy Trọ ${currentUser.name}` 
+              : 'Dãy Trọ Của Tôi'),
+      });
+    }
+
+    const docRef = doc(db, 'settings', targetLandlordId);
+    const unsub = onSnapshot(docRef, (dSnap) => {
+      if (!dSnap.exists()) {
+        const initialWithId = {
+          ...INITIAL_LANDLORD_SETTINGS,
+          landlordId: targetLandlordId === 'main' ? '' : targetLandlordId,
+          houseName: targetLandlordId === 'main' 
+            ? 'Dãy Trọ Của Tôi' 
+            : (currentUser.role === 'landlord' && currentUser.name 
+                ? `Dãy Trọ ${currentUser.name}` 
+                : 'Dãy Trọ Của Tôi'),
+        };
+        setDoc(docRef, sanitizeForFirestore(initialWithId));
+      } else {
+        const data = dSnap.data() as LandlordSettings;
+        setSettings(data);
+        localStorage.setItem(`${STORAGE_KEY}_settings_${targetLandlordId}`, JSON.stringify(data));
+      }
+    }, (err) => console.error('Firestore settings listener error:', err));
+
+    return () => unsub();
+  }, [currentUser.id, currentUser.landlordId, currentUser.role]);
 
   // Auto-heal/sync currentUser if tenant request was accepted by landlord or room assigned
   useEffect(() => {
@@ -579,7 +647,14 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (currentUser.role === 'landlord') {
       return n.receiverId === currentUser.id || n.receiverId === 'all' || n.landlordId === currentUser.id;
     }
-    return n.receiverId === currentUser.id || n.receiverId === 'all_tenants' || n.receiverId === 'all';
+    if (currentUser.role === 'tenant') {
+      return (
+        n.receiverId === currentUser.id ||
+        (n.receiverId === 'all_tenants' && n.landlordId === currentUser.landlordId) ||
+        n.receiverId === 'all'
+      );
+    }
+    return n.receiverId === currentUser.id || n.receiverId === 'all';
   });
 
   const unreadNotifsCount = userNotifications.filter((n) => !n.isRead).length;
@@ -1066,6 +1141,69 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const deleteContract = (contractId: string) => {
+    const targetContract = contracts.find((c) => c.id === contractId);
+    if (targetContract) {
+      const { tenantId, roomId } = targetContract;
+
+      // 1. If there's an associated tenant, reset their link status so they are completely removed from the boarding house
+      if (tenantId) {
+        const tenant = users.find((u) => u.id === tenantId);
+        if (tenant) {
+          saveUserToFirestore({
+            ...tenant,
+            roomId: undefined,
+            landlordId: undefined,
+            status: 'pending_approval',
+          });
+          setUsers((prev) =>
+            prev.map((u) =>
+              u.id === tenantId
+                ? { ...u, roomId: undefined, landlordId: undefined, status: 'pending_approval' }
+                : u
+            )
+          );
+          // Sync with landlord's Google Sheet
+          syncToGoogleSheet('DELETE', { id: tenantId });
+        }
+      }
+
+      // 2. If there's an associated room, make sure it is vacant if it was occupied by this tenant
+      if (roomId) {
+        const targetRoom = rooms.find((r) => r.id === roomId);
+        if (targetRoom && targetRoom.currentTenantId === tenantId) {
+          saveRoomToFirestore({
+            ...targetRoom,
+            status: 'available',
+            currentTenantId: undefined,
+            currentTenantName: undefined,
+          });
+          setRooms((prev) =>
+            prev.map((r) =>
+              r.id === roomId
+                ? {
+                    ...r,
+                    status: 'available',
+                    currentTenantId: undefined,
+                    currentTenantName: undefined,
+                  }
+                : r
+            )
+          );
+        }
+      }
+
+      // 3. Add security logs
+      addSecurityLog({
+        targetType: 'room_door',
+        targetLabel: roomId ? `Phòng ${roomId}` : 'Hợp đồng',
+        action: 'admin_override',
+        performedBy: currentUser ? currentUser.name : 'Chủ trọ',
+        role: currentUser ? currentUser.role : 'landlord',
+        success: true,
+        note: `Đã hủy liên kết khách thuê và giải phóng phòng do chủ trọ xóa hợp đồng điện tử.`,
+      });
+    }
+
     setContracts((prev) => prev.filter((c) => c.id !== contractId));
     deleteContractFromFirestore(contractId);
   };
@@ -2237,6 +2375,87 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setDoc(doc(db, 'telemetry', 'main'), sanitizeForFirestore(INITIAL_TELEMETRY));
   };
 
+  // Dynamic visual/data isolation per landlord / tenant role to keep views clean and perfect
+  const filteredUsers = React.useMemo(() => {
+    if (currentUser.role === 'landlord') {
+      return users.filter((u) => u.role === 'admin' || u.id === currentUser.id || u.landlordId === currentUser.id);
+    }
+    if (currentUser.role === 'tenant') {
+      return users.filter((u) => u.role === 'admin' || u.id === currentUser.id || u.id === currentUser.landlordId || u.landlordId === currentUser.landlordId);
+    }
+    return users;
+  }, [users, currentUser]);
+
+  const filteredRooms = React.useMemo(() => {
+    if (currentUser.role === 'landlord') {
+      return rooms.filter((r) => r.landlordId === currentUser.id);
+    }
+    if (currentUser.role === 'tenant') {
+      return rooms.filter((r) => r.landlordId === currentUser.landlordId);
+    }
+    return rooms;
+  }, [rooms, currentUser]);
+
+  const filteredContracts = React.useMemo(() => {
+    if (currentUser.role === 'landlord') {
+      return contracts.filter((c) => c.landlordId === currentUser.id);
+    }
+    if (currentUser.role === 'tenant') {
+      return contracts.filter((c) => c.tenantId === currentUser.id);
+    }
+    return contracts;
+  }, [contracts, currentUser]);
+
+  const filteredInvoices = React.useMemo(() => {
+    if (currentUser.role === 'landlord') {
+      return invoices.filter((i) => i.landlordId === currentUser.id);
+    }
+    if (currentUser.role === 'tenant') {
+      return invoices.filter((i) => i.roomId === currentUser.roomId);
+    }
+    return invoices;
+  }, [invoices, currentUser]);
+
+  const filteredIssues = React.useMemo(() => {
+    if (currentUser.role === 'landlord') {
+      return issues.filter((i) => i.landlordId === currentUser.id);
+    }
+    if (currentUser.role === 'tenant') {
+      return issues.filter((i) => i.tenantId === currentUser.id);
+    }
+    return issues;
+  }, [issues, currentUser]);
+
+  const filteredJoinRequests = React.useMemo(() => {
+    if (currentUser.role === 'landlord') {
+      return joinRequests.filter((j) => j.landlordId === currentUser.id);
+    }
+    if (currentUser.role === 'tenant') {
+      return joinRequests.filter((j) => j.tenantId === currentUser.id);
+    }
+    return joinRequests;
+  }, [joinRequests, currentUser]);
+
+  const filteredComplaints = React.useMemo(() => {
+    if (currentUser.role === 'landlord') {
+      return complaints.filter((c) => c.landlordId === currentUser.id);
+    }
+    if (currentUser.role === 'tenant') {
+      return complaints.filter((c) => c.tenantId === currentUser.id);
+    }
+    return complaints;
+  }, [complaints, currentUser]);
+
+  const filteredSecurityLogs = React.useMemo(() => {
+    if (currentUser.role === 'landlord') {
+      return securityLogs.filter((s) => s.landlordId === currentUser.id);
+    }
+    if (currentUser.role === 'tenant') {
+      return securityLogs.filter((s) => s.roomId === currentUser.roomId);
+    }
+    return securityLogs;
+  }, [securityLogs, currentUser]);
+
   return (
     <RentalContext.Provider
       value={{
@@ -2247,20 +2466,20 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         logout,
         currentUser,
         setCurrentUser,
-        users,
+        users: filteredUsers,
         switchUserById,
         switchRoleQuick,
         settings,
-        rooms,
-        contracts,
-        invoices,
-        issues,
+        rooms: filteredRooms,
+        contracts: filteredContracts,
+        invoices: filteredInvoices,
+        issues: filteredIssues,
         notifications: userNotifications,
-        joinRequests,
+        joinRequests: filteredJoinRequests,
         telemetry,
         licenses,
-        complaints,
-        securityLogs,
+        complaints: filteredComplaints,
+        securityLogs: filteredSecurityLogs,
         unreadNotifsCount,
         markNotificationAsRead,
         markAllNotificationsAsRead,
