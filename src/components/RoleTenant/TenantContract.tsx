@@ -5,7 +5,8 @@ import {
   Building, 
   User, 
   ShieldCheck,
-  KeyRound
+  KeyRound,
+  Clock
 } from 'lucide-react';
 
 interface TenantContractProps {
@@ -13,9 +14,26 @@ interface TenantContractProps {
 }
 
 export const TenantContract: React.FC<TenantContractProps> = ({ onNavigateTab }) => {
-  const { currentUser, rooms, contracts, settings } = useRental();
+  const { currentUser, rooms, contracts, settings, joinRequests } = useRental();
 
-  if (!currentUser.roomId) {
+  const myContractMatch = contracts?.find(
+    (c) => (c.tenantId === currentUser.id || (currentUser.phone && c.tenantPhone === currentUser.phone)) && c.status === 'active'
+  );
+
+  const cleanUserRoomId = currentUser.roomId && currentUser.roomId !== 'Chưa chọn phòng' && currentUser.roomId !== 'Chưa gán phòng' ? currentUser.roomId : undefined;
+
+  const matchedRoom = rooms.find(
+    (r) => (cleanUserRoomId && (r.id === cleanUserRoomId || r.roomNumber === cleanUserRoomId)) ||
+           r.currentTenantId === currentUser.id ||
+           (currentUser.phone && r.currentTenantName && currentUser.name && r.currentTenantName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+           (myContractMatch && (r.id === myContractMatch.roomId || r.roomNumber === myContractMatch.roomNumber))
+  ) || (cleanUserRoomId ? rooms.find((r) => r.id === cleanUserRoomId || r.roomNumber === cleanUserRoomId) : undefined);
+
+  const pendingReq = joinRequests?.find(
+    (r) => (r.tenantId === currentUser.id || (currentUser.phone && r.tenantPhone === currentUser.phone)) && r.status === 'pending'
+  );
+
+  if (!matchedRoom && pendingReq) {
     return (
       <div className="space-y-6">
         <div>
@@ -27,7 +45,61 @@ export const TenantContract: React.FC<TenantContractProps> = ({ onNavigateTab })
           </p>
         </div>
 
-        <div className="p-8 bg-amber-50 border border-amber-200 rounded-2xl text-center space-y-4 max-w-xl mx-auto">
+        <div className="p-6 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl space-y-4 max-w-xl mx-auto shadow-sm">
+          <div className="flex items-center gap-3 border-b border-amber-200/60 pb-4">
+            <div className="w-11 h-11 bg-amber-500 text-white rounded-xl flex items-center justify-center shadow-md shrink-0">
+              <Clock className="w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <span className="px-2.5 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-bold rounded-full uppercase tracking-wider">
+                Đang chờ duyệt
+              </span>
+              <h3 className="font-bold text-slate-900 text-base mt-0.5">
+                Chờ chủ trọ kích hoạt bàn giao phòng
+              </h3>
+            </div>
+          </div>
+
+          <div className="space-y-2 text-xs text-slate-700 bg-white/80 p-4 rounded-xl border border-amber-100">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Mã kết nối:</span>
+              <span className="font-mono font-bold text-slate-900">{pendingReq.hostCodeInput}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Dãy trọ:</span>
+              <span className="font-semibold text-slate-900">{settings?.houseName || 'Nhà trọ Quản lí nhà trọ'}</span>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-600 leading-relaxed italic">
+            💡 Bạn đã gửi mã kết nối thành công. Hợp đồng điện tử ký số sẽ tự động khởi tạo ngay khi chủ trọ phê duyệt yêu cầu của bạn!
+          </p>
+
+          <button
+            onClick={() => onNavigateTab('join')}
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold text-xs shadow-xs transition-all inline-flex items-center gap-2"
+          >
+            <KeyRound className="w-4 h-4" />
+            <span>Xem chi tiết yêu cầu</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!matchedRoom && !currentUser.roomId && !currentUser.landlordId) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Hợp Đồng Điện Tử
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Thông tin hợp đồng thuê phòng số hóa giữa bạn và chủ nhà
+          </p>
+        </div>
+
+        <div className="p-8 bg-amber-50 border border-amber-200 rounded-2xl text-center space-y-4 max-w-xl mx-auto shadow-sm">
           <div className="w-12 h-12 bg-amber-500 text-white rounded-2xl flex items-center justify-center mx-auto shadow-md">
             <KeyRound className="w-6 h-6" />
           </div>
@@ -49,7 +121,23 @@ export const TenantContract: React.FC<TenantContractProps> = ({ onNavigateTab })
     );
   }
 
-  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms[0];
+  const fallbackRoom = {
+    id: currentUser.roomId || 'room_default',
+    landlordId: settings.landlordId || '',
+    roomNumber: 'Phòng thuê',
+    floor: 1,
+    areaM2: 25,
+    basePrice: 2500000,
+    amenities: ['Điều hòa', 'Wifi'],
+    status: 'occupied' as const,
+    doorLockState: 'locked' as const,
+    doorPasscode: '123456',
+    securityStatus: 'secure' as const,
+    electricityMeterStart: 100,
+    waterMeterStart: 30,
+  };
+
+  const myRoom = matchedRoom || rooms[0] || fallbackRoom;
   const contract = contracts.find((c) => c.roomId === myRoom.id && c.status === 'active') || contracts[0];
 
   if (!contract) {

@@ -75,7 +75,7 @@ export const Header: React.FC = () => {
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-400 font-medium">
-                  {currentUser.role === 'tenant' && !currentUser.landlordId && !joinRequests.some((r) => r.tenantId === currentUser.id)
+                  {currentUser.role === 'tenant' && !currentUser.landlordId
                     ? 'Chưa kết nối trọ'
                     : settings.houseName}
                 </div>

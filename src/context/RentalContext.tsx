@@ -378,6 +378,11 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       } else {
         const fetched = snap.docs.map((d) => d.data() as User);
         setUsers(fetched);
+        setCurrentUser((curr) => {
+          if (!curr || !curr.id) return curr;
+          const match = fetched.find((u) => u.id === curr.id);
+          return match ? { ...curr, ...match } : curr;
+        });
       }
     }, (err) => console.error('Firestore users listener error:', err));
 
@@ -493,6 +498,50 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       unsubTelemetry();
     };
   }, []);
+
+  // Auto-heal/sync currentUser if tenant request was accepted by landlord or room assigned
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'tenant') return;
+
+    const hasJoinRequestAccepted = joinRequests.some(
+      (r) => (r.tenantId === currentUser.id || (currentUser.phone && r.tenantPhone === currentUser.phone)) && r.status === 'accepted'
+    );
+    if (!currentUser.landlordId && !hasJoinRequestAccepted) {
+      return;
+    }
+
+    const acceptedReq = joinRequests.find(
+      (r) => (r.tenantId === currentUser.id || (currentUser.phone && r.tenantPhone === currentUser.phone)) && r.status === 'accepted'
+    );
+    const activeContract = contracts.find(
+      (c) => (c.tenantId === currentUser.id || (currentUser.phone && c.tenantPhone === currentUser.phone)) && c.status === 'active'
+    );
+    const tenantRoom = rooms.find(
+      (r) => r.currentTenantId === currentUser.id ||
+             (currentUser.phone && r.currentTenantName && currentUser.name && r.currentTenantName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+             (activeContract && (r.id === activeContract.roomId || r.roomNumber === activeContract.roomNumber)) ||
+             (currentUser.roomId && currentUser.roomId !== 'Chưa chọn phòng' && currentUser.roomId !== 'Chưa gán phòng' && (r.id === currentUser.roomId || r.roomNumber === currentUser.roomId))
+    );
+
+    const hasValidRoomId = currentUser.roomId && currentUser.roomId !== 'Chưa chọn phòng' && currentUser.roomId !== 'Chưa gán phòng';
+
+    if ((acceptedReq || activeContract || tenantRoom) && (!hasValidRoomId || !currentUser.landlordId || currentUser.status !== 'active')) {
+      const rawRoomId = tenantRoom?.id || activeContract?.roomId || (acceptedReq?.roomIdRequested && acceptedReq.roomIdRequested !== 'Chưa chọn phòng' && acceptedReq.roomIdRequested !== 'Chưa gán phòng' ? acceptedReq.roomIdRequested : undefined);
+      const targetRoomId = rawRoomId && rawRoomId !== 'Chưa chọn phòng' && rawRoomId !== 'Chưa gán phòng' ? rawRoomId : undefined;
+      const targetLandlordId = tenantRoom?.landlordId || activeContract?.landlordId || acceptedReq?.landlordId || settings.landlordId || currentUser.landlordId;
+
+      if (targetRoomId || targetLandlordId) {
+        const updated: User = {
+          ...currentUser,
+          status: 'active',
+          landlordId: targetLandlordId || currentUser.landlordId,
+          roomId: targetRoomId || currentUser.roomId,
+        };
+        setCurrentUser(updated);
+        saveUserToFirestore(updated);
+      }
+    }
+  }, [joinRequests, contracts, rooms, currentUser, settings.landlordId]);
 
   // Real-time IoT simulator: slight power and flow fluctuation every 4 seconds
   useEffect(() => {
@@ -1062,41 +1111,53 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       setRooms((prev) => [...prev, targetRoom!]);
     } else {
-      // Update existing Room occupancy
+      targetRoom = {
+        ...targetRoom,
+        status: 'occupied',
+        currentTenantId: req.tenantId,
+        currentTenantName: req.tenantName,
+      };
       setRooms((prev) =>
-        prev.map((rm) =>
-          rm.id === targetRoom!.id
-            ? {
-                ...rm,
-                status: 'occupied',
-                currentTenantId: req.tenantId,
-                currentTenantName: req.tenantName,
-              }
-            : rm
-        )
+        prev.map((rm) => (rm.id === targetRoom!.id ? targetRoom! : rm))
       );
     }
+    // Save updated/created room to Firestore
+    saveRoomToFirestore(targetRoom);
 
-    // Update request status
+    // Update request status in state & Firestore
+    const updatedRequest: JoinRequest = { ...req, status: 'accepted' };
+    saveJoinRequestToFirestore(updatedRequest);
     setJoinRequests((prev) =>
-      prev.map((r) => (r.id === requestId ? { ...r, status: 'accepted' } : r))
+      prev.map((r) => (r.id === requestId ? updatedRequest : r))
     );
 
-    // Update user link
+    // Update user link in state & Firestore
+    const existingTenantUser = users.find((u) => u.id === req.tenantId);
+    const updatedTenantUser: User = existingTenantUser
+      ? {
+          ...existingTenantUser,
+          status: 'active',
+          landlordId: settings.landlordId || currentUser.id,
+          roomId: targetRoom.id,
+        }
+      : {
+          id: req.tenantId,
+          name: req.tenantName,
+          phone: req.tenantPhone,
+          email: req.tenantEmail,
+          role: 'tenant',
+          status: 'active',
+          landlordId: settings.landlordId || currentUser.id,
+          roomId: targetRoom.id,
+          createdAt: new Date().toLocaleDateString('vi-VN'),
+        };
+
+    saveUserToFirestore(updatedTenantUser);
     setUsers((prev) =>
-      prev.map((u) =>
-        u.id === req.tenantId
-          ? {
-              ...u,
-              status: 'active',
-              landlordId: settings.landlordId || currentUser.id,
-              roomId: targetRoom!.id,
-            }
-          : u
-      )
+      prev.map((u) => (u.id === req.tenantId ? updatedTenantUser : u))
     );
 
-    // Create Contract with dynamic Landlord Name
+    // Create Contract with dynamic Landlord Name & save to Firestore
     const landlordDisplayName = getLandlordName();
     const newContract: Contract = {
       id: `contract_${Date.now()}`,
@@ -1122,6 +1183,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       status: 'active',
       signedAt: new Date().toLocaleString('vi-VN'),
     };
+    saveContractToFirestore(newContract);
     setContracts((prev) => [newContract, ...prev]);
 
     // Automatically sync new tenant to Landlord's Google Sheet
@@ -1137,31 +1199,32 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
 
     // Initialize telemetry for new room if missing
-    if (!telemetry[targetRoom.id]) {
-      setTelemetry((prev) => ({
-        ...prev,
-        [targetRoom.id]: {
-          roomId: targetRoom.id,
-          currentKwh: targetRoom.electricityMeterStart || 100,
-          currentWaterM3: targetRoom.waterMeterStart || 10,
-          voltage: 220.5,
-          currentAmps: 2.1,
-          powerWatts: 463,
-          waterFlowRateLpm: 0,
-          lastTelemetryPing: 'Vừa xong',
-          dailyKwhTrend: [
-            { hour: '00:00', kwh: 0.2 },
-            { hour: '08:00', kwh: 0.8 },
-            { hour: '16:00', kwh: 1.1 },
-            { hour: '20:00', kwh: 1.8 },
-          ],
-          dailyWaterTrend: [
-            { hour: '08:00', liters: 20 },
-            { hour: '20:00', liters: 35 },
-          ],
-          aiAnomalyFlag: false,
-        },
-      }));
+    let newTelemDict = { ...telemetry };
+    if (!newTelemDict[targetRoom.id]) {
+      const roomTelem = {
+        roomId: targetRoom.id,
+        currentKwh: targetRoom.electricityMeterStart || 100,
+        currentWaterM3: targetRoom.waterMeterStart || 10,
+        voltage: 220.5,
+        currentAmps: 2.1,
+        powerWatts: 463,
+        waterFlowRateLpm: 0,
+        lastTelemetryPing: 'Vừa xong',
+        dailyKwhTrend: [
+          { hour: '00:00', kwh: 0.2 },
+          { hour: '08:00', kwh: 0.8 },
+          { hour: '16:00', kwh: 1.1 },
+          { hour: '20:00', kwh: 1.8 },
+        ],
+        dailyWaterTrend: [
+          { hour: '08:00', liters: 20 },
+          { hour: '20:00', liters: 35 },
+        ],
+        aiAnomalyFlag: false,
+      };
+      newTelemDict = { ...newTelemDict, [targetRoom.id]: roomTelem };
+      setTelemetry(newTelemDict);
+      saveTelemetryToFirestore(newTelemDict);
     }
 
     // Send welcome notification to tenant
@@ -1178,20 +1241,20 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       isRead: false,
       priority: 'high',
     };
+    saveNotificationToFirestore(welcomeNotif);
     setNotifications((prev) => [welcomeNotif, ...prev]);
 
     // If current user is this tenant, sync active state
     if (currentUser.id === req.tenantId) {
-      setCurrentUser((prev) => ({
-        ...prev,
-        status: 'active',
-        landlordId: settings.landlordId,
-        roomId: targetRoom.id,
-      }));
+      setCurrentUser(updatedTenantUser);
     }
   };
 
   const rejectJoinRequest = (requestId: string) => {
+    const req = joinRequests.find((r) => r.id === requestId);
+    if (req) {
+      saveJoinRequestToFirestore({ ...req, status: 'rejected' });
+    }
     setJoinRequests((prev) =>
       prev.map((r) => (r.id === requestId ? { ...r, status: 'rejected' } : r))
     );

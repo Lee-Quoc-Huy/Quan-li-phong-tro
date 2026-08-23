@@ -13,20 +13,17 @@ import {
 export const TenantJoinHost: React.FC = () => {
   const { currentUser, settings, submitHostCode, joinRequests, rooms } = useRental();
   const [code, setCode] = useState('');
-  const [selectedRoom, setSelectedRoom] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const myPendingRequest = joinRequests.find(
     (r) => r.tenantId === currentUser.id && r.status === 'pending'
   );
 
-  const availableRooms = rooms.filter((r) => r.status === 'available');
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim()) return;
 
-    const res = submitHostCode(code, currentUser.id, selectedRoom || undefined);
+    const res = submitHostCode(code, currentUser.id, undefined);
     setFeedback({
       type: res.success ? 'success' : 'error',
       message: res.message,
@@ -77,7 +74,7 @@ export const TenantJoinHost: React.FC = () => {
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
               <span className="text-slate-400">Phòng ở:</span>
               <div className="font-mono font-bold text-slate-900 mt-1">
-                {rooms.find((r) => r.id === currentUser.roomId)?.roomNumber || 'P103'}
+                {rooms.find((r) => r.id === currentUser.roomId || r.roomNumber === currentUser.roomId || r.currentTenantId === currentUser.id)?.roomNumber || 'Phòng 101'}
               </div>
             </div>
           </div>
@@ -122,27 +119,9 @@ export const TenantJoinHost: React.FC = () => {
             />
           </div>
 
-          {availableRooms.length > 0 ? (
-            <div className="space-y-1">
-              <label className="text-slate-700 font-semibold block">Đăng ký phòng ở mong muốn (Tùy chọn):</label>
-              <select
-                value={selectedRoom}
-                onChange={(e) => setSelectedRoom(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm outline-none focus:border-teal-500 font-medium"
-              >
-                <option value="">-- Để Chủ trọ xếp phòng sau --</option>
-                {availableRooms.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.roomNumber} ({r.basePrice.toLocaleString('vi-VN')} đ/tháng)
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="text-[11px] text-slate-500 italic bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-              * Dãy trọ chưa công khai danh sách phòng trống. Bạn cứ gửi yêu cầu, chủ trọ sẽ xếp phòng khi duyệt.
-            </div>
-          )}
+          <div className="text-[11px] text-slate-500 italic bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+            * Sau khi gửi yêu cầu kết nối thành công, chủ trọ sẽ tiến hành duyệt yêu cầu và trực tiếp chỉ định, bàn giao phòng ở phù hợp cho bạn.
+          </div>
 
           <button
             type="submit"

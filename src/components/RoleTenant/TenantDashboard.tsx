@@ -32,31 +32,118 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onNavigateTab 
     telemetry, 
     toggleRoomDoor, 
     settings,
-    issues 
+    issues,
+    joinRequests
   } = useRental();
 
   const [selectedInvoiceForPay, setSelectedInvoiceForPay] = useState<Invoice | null>(null);
 
-  if (!currentUser.roomId) {
+  // Active contract matching
+  const myContractMatch = contracts.find(
+    (c) => (c.tenantId === currentUser.id || (currentUser.phone && c.tenantPhone === currentUser.phone)) && c.status === 'active'
+  );
+
+  const cleanUserRoomId = currentUser.roomId && currentUser.roomId !== 'Chưa chọn phòng' && currentUser.roomId !== 'Chưa gán phòng' ? currentUser.roomId : undefined;
+
+  // Find tenant's current room safely by ID, roomNumber, tenant name, or contract
+  const matchedRoom = rooms.find(
+    (r) => (cleanUserRoomId && (r.id === cleanUserRoomId || r.roomNumber === cleanUserRoomId)) ||
+           r.currentTenantId === currentUser.id ||
+           (currentUser.phone && r.currentTenantName && currentUser.name && r.currentTenantName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+           (myContractMatch && (r.id === myContractMatch.roomId || r.roomNumber === myContractMatch.roomNumber))
+  ) || (cleanUserRoomId ? rooms.find((r) => r.id === cleanUserRoomId || r.roomNumber === cleanUserRoomId) : undefined);
+
+  // Find pending join request
+  const pendingReq = joinRequests.find(
+    (r) => (r.tenantId === currentUser.id || (currentUser.phone && r.tenantPhone === currentUser.phone)) && r.status === 'pending'
+  );
+
+  // 1. Pending request state (Tenant entered host code, awaiting landlord approval)
+  if (!matchedRoom && pendingReq) {
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Chưa Nhận Phòng
+            Đã Kết Nối Dãy Trọ - Đang Chờ Phê Duyệt
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Yêu cầu tham gia dãy trọ của bạn đã được gửi thành công
+          </p>
+        </div>
+
+        <div className="p-6 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl space-y-4 max-w-xl mx-auto shadow-sm">
+          <div className="flex items-center gap-3 border-b border-amber-200/60 pb-4">
+            <div className="w-11 h-11 bg-amber-500 text-white rounded-xl flex items-center justify-center shadow-md shrink-0">
+              <Clock className="w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <span className="px-2.5 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-bold rounded-full uppercase tracking-wider">
+                Đang chờ chủ trọ duyệt
+              </span>
+              <h3 className="font-bold text-slate-900 text-base mt-0.5">
+                Chờ chủ trọ kích hoạt bàn giao phòng
+              </h3>
+            </div>
+          </div>
+
+          <div className="space-y-2 text-xs text-slate-700 bg-white/80 p-4 rounded-xl border border-amber-100">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Mã chủ trọ đã nhập:</span>
+              <span className="font-mono font-bold text-slate-900">{pendingReq.hostCodeInput}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Dãy trọ:</span>
+              <span className="font-semibold text-slate-900">{settings.houseName || 'Nhà trọ Quản lí nhà trọ'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Phòng đăng ký:</span>
+              <span className="font-semibold text-teal-700">{pendingReq.roomIdRequested || 'Chủ trọ tự xếp phòng'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Thời gian gửi:</span>
+              <span className="text-slate-600">{pendingReq.createdAt}</span>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-600 leading-relaxed italic">
+            💡 <strong>Xác nhận kết nối:</strong> Tài khoản của bạn đã gửi yêu cầu thành công tới chủ trọ. Vui lòng nhắn tin hoặc liên hệ chủ nhà trọ để duyệt. Ngay khi chủ trọ bấm "Duyệt", thông tin phòng, chỉ số điện nước và khóa cửa sẽ hiển thị đầy đủ tại đây!
+          </p>
+
+          <div className="pt-2 flex flex-wrap gap-2">
+            <button
+              onClick={() => onNavigateTab('join')}
+              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold text-xs shadow-xs transition-all inline-flex items-center gap-2"
+            >
+              <KeyRound className="w-4 h-4" />
+              <span>Xem chi tiết / Nhập lại Mã Chủ Trọ</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Unconnected state (No request and no room)
+  if (!matchedRoom && !currentUser.roomId && !currentUser.landlordId) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Chưa Bàn Giao Phòng
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
             Tài khoản khách thuê chưa được bàn giao phòng
           </p>
         </div>
 
-        <div className="p-8 bg-amber-50 border border-amber-200 rounded-2xl text-center space-y-4 max-w-xl mx-auto">
+        <div className="p-8 bg-amber-50 border border-amber-200 rounded-2xl text-center space-y-4 max-w-xl mx-auto shadow-sm">
           <div className="w-12 h-12 bg-amber-500 text-white rounded-2xl flex items-center justify-center mx-auto shadow-md">
             <KeyRound className="w-6 h-6" />
           </div>
           <div className="space-y-1">
-            <h3 className="font-bold text-slate-900 text-base">Vui lòng nhập Mã chủ trọ và chờ phê duyệt</h3>
+            <h3 className="font-bold text-slate-900 text-base">Vui lòng nhập Mã chủ trọ để kết nối</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Bạn chưa được chủ trọ chấp nhận vào thuê phòng. Theo quy định, bạn cần vào mục <strong>"Nhập mã chủ trọ"</strong>, điền đúng mã định danh của chủ nhà và chờ chủ trọ duyệt để nhận phòng cùng các tính năng thông tin phòng.
+              Bạn chưa nhập mã kết nối của chủ trọ. Vào mục <strong>"Nhập mã chủ trọ"</strong>, điền mã 10 ký tự của chủ nhà cung cấp để nhận phòng và xem chỉ số điện nước.
             </p>
           </div>
           <button
@@ -71,8 +158,24 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onNavigateTab 
     );
   }
 
-  // Find tenant's current room safely
-  const myRoom = rooms.find((r) => r.id === currentUser.roomId) || rooms[0];
+  // Active room fallback object to guarantee rendering never crashes
+  const fallbackRoom = {
+    id: currentUser.roomId || 'room_default',
+    landlordId: settings.landlordId || '',
+    roomNumber: 'Phòng thuê',
+    floor: 1,
+    areaM2: 25,
+    basePrice: 2500000,
+    amenities: ['Điều hòa', 'Wifi'],
+    status: 'occupied' as const,
+    doorLockState: 'locked' as const,
+    doorPasscode: '123456',
+    securityStatus: 'secure' as const,
+    electricityMeterStart: 100,
+    waterMeterStart: 30,
+  };
+
+  const myRoom = matchedRoom || rooms[0] || fallbackRoom;
   const myContract = contracts.find((c) => c.roomId === myRoom.id && c.status === 'active');
   const myTelemetry = telemetry[myRoom.id] || {
     roomId: myRoom.id,

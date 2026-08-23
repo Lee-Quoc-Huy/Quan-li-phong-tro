@@ -156,7 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 Hệ Thống Quản Lý Trọ
               </div>
               <div className="text-[11px] text-slate-500 font-medium">
-                {currentUser.role === 'tenant' && !currentUser.landlordId && !joinRequests.some((r) => r.tenantId === currentUser.id)
+                {currentUser.role === 'tenant' && !currentUser.landlordId
                   ? 'Chưa kết nối trọ'
                   : settings.houseName}
               </div>
