@@ -656,9 +656,22 @@ export const AdminDashboard: React.FC = () => {
                   (l.hostCode && l.hostCode.toLowerCase().includes(searchUser.toLowerCase()))
                 )
                 .map((l) => {
-                  // Find tenants belonging to this landlord
+                  // Find tenants belonging to this specific landlord only
                   const landlordTenants = users.filter(
-                    (u) => u.role === 'tenant' && (u.landlordId === l.id || (!u.landlordId && l.id === landlords[0]?.id))
+                    (u) =>
+                      u.role === 'tenant' &&
+                      (u.landlordId === l.id ||
+                        (u.roomId &&
+                          rooms.some(
+                            (r) =>
+                              r.id === u.roomId &&
+                              (r.landlordId === l.id || (!r.landlordId && l.id === 'landlord_1'))
+                          )) ||
+                        contracts.some(
+                          (c) =>
+                            (c.tenantId === u.id || (u.phone && c.tenantPhone === u.phone)) &&
+                            (c.landlordId === l.id || (!c.landlordId && l.id === 'landlord_1'))
+                        ))
                   );
 
                   const filteredTenants = landlordTenants.filter(
@@ -818,7 +831,8 @@ export const AdminDashboard: React.FC = () => {
               (u) =>
                 u.role === 'tenant' &&
                 !u.landlordId &&
-                landlords.every((l) => l.id !== u.landlordId)
+                !u.roomId &&
+                !contracts.some((c) => c.tenantId === u.id || (u.phone && c.tenantPhone === u.phone))
             );
 
             const filteredUnassigned = unassignedList.filter(
