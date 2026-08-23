@@ -42,6 +42,7 @@ export const AdminDashboard: React.FC = () => {
   const { 
     users, 
     rooms, 
+    contracts = [],
     invoices, 
     issues, 
     complaints,
