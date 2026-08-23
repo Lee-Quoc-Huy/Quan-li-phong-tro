@@ -4,6 +4,7 @@ import {
   collection,
   doc,
   setDoc,
+  updateDoc,
   deleteDoc,
   onSnapshot,
 } from 'firebase/firestore';
@@ -65,6 +66,7 @@ interface RentalContextType {
   switchRoleQuick: (role: UserRole) => void;
   
   // Data Collections
+  currentHouseName: string;
   settings: LandlordSettings;
   rooms: Room[];
   contracts: Contract[];
@@ -523,24 +525,48 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     let targetLandlordId = 'main';
     if (currentUser.role === 'landlord') {
       targetLandlordId = currentUser.id;
-    } else if (currentUser.role === 'tenant' && currentUser.landlordId) {
-      targetLandlordId = currentUser.landlordId;
+    } else if (currentUser.role === 'tenant') {
+      if (currentUser.landlordId) {
+        targetLandlordId = currentUser.landlordId;
+      } else {
+        const pendingReq = joinRequests.find(
+          (r) => (r.tenantId === currentUser.id || (currentUser.phone && r.tenantPhone === currentUser.phone)) && r.status === 'pending'
+        );
+        if (pendingReq && pendingReq.landlordId) {
+          targetLandlordId = pendingReq.landlordId;
+        }
+      }
     }
 
     const cached = localStorage.getItem(`${STORAGE_KEY}_settings_${targetLandlordId}`);
+    
+    // Resolve dynamic default house name for this landlord
+    const getDefaultHouseName = () => {
+      if (currentUser.role === 'landlord') {
+        return currentUser.houseName || (currentUser.name ? `Dãy Trọ ${currentUser.name}` : 'Dãy Trọ');
+      }
+      if (currentUser.role === 'tenant') {
+        const targetLandlord = users.find((u) => u.id === targetLandlordId);
+        return targetLandlord?.houseName || (targetLandlord?.name ? `Dãy Trọ ${targetLandlord.name}` : 'Dãy Trọ');
+      }
+      return 'Dãy Trọ';
+    };
+
+    const defaultHouseName = getDefaultHouseName();
+
     if (cached) {
       try {
-        setSettings(JSON.parse(cached));
+        const parsed = JSON.parse(cached);
+        if (parsed.houseName === 'Dãy Trọ Của Tôi' && defaultHouseName !== 'Dãy Trọ Của Tôi') {
+          parsed.houseName = defaultHouseName;
+        }
+        setSettings(parsed);
       } catch (e) {}
     } else {
       setSettings({
         ...INITIAL_LANDLORD_SETTINGS,
         landlordId: targetLandlordId === 'main' ? '' : targetLandlordId,
-        houseName: targetLandlordId === 'main' 
-          ? 'Dãy Trọ Của Tôi' 
-          : (currentUser.role === 'landlord' && currentUser.name 
-              ? `Dãy Trọ ${currentUser.name}` 
-              : 'Dãy Trọ Của Tôi'),
+        houseName: defaultHouseName,
       });
     }
 
@@ -550,22 +576,22 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         const initialWithId = {
           ...INITIAL_LANDLORD_SETTINGS,
           landlordId: targetLandlordId === 'main' ? '' : targetLandlordId,
-          houseName: targetLandlordId === 'main' 
-            ? 'Dãy Trọ Của Tôi' 
-            : (currentUser.role === 'landlord' && currentUser.name 
-                ? `Dãy Trọ ${currentUser.name}` 
-                : 'Dãy Trọ Của Tôi'),
+          houseName: defaultHouseName,
         };
         setDoc(docRef, sanitizeForFirestore(initialWithId));
       } else {
         const data = dSnap.data() as LandlordSettings;
+        if (data.houseName === 'Dãy Trọ Của Tôi' && defaultHouseName !== 'Dãy Trọ Của Tôi') {
+          data.houseName = defaultHouseName;
+          updateDoc(docRef, { houseName: defaultHouseName }).catch(() => {});
+        }
         setSettings(data);
         localStorage.setItem(`${STORAGE_KEY}_settings_${targetLandlordId}`, JSON.stringify(data));
       }
     }, (err) => console.error('Firestore settings listener error:', err));
 
     return () => unsub();
-  }, [currentUser.id, currentUser.landlordId, currentUser.role]);
+  }, [currentUser.id, currentUser.landlordId, currentUser.role, joinRequests]);
 
   // Auto-heal/sync currentUser if tenant request was accepted by landlord or room assigned
   useEffect(() => {
@@ -845,14 +871,16 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     // If landlord, update or create building settings
     if (userData.role === 'landlord') {
+      const landlordHouseName = userData.houseName?.trim() || `Dãy Trọ ${userData.name.trim()}`;
       const newSettings = {
         ...settings,
         landlordId: newId,
-        houseName: userData.houseName || `${userData.name} - Nhà trọ Quản lí nhà trọ`,
+        houseName: landlordHouseName,
         houseAddress: userData.houseAddress || 'Số 123 Đường Số 1, TP. Hồ Chí Minh',
         hostCode: generatedHostCode || settings.hostCode,
       };
       setSettings(newSettings);
+      localStorage.setItem(`${STORAGE_KEY}_settings_${newId}`, JSON.stringify(newSettings));
       saveSettingsToFirestore(newSettings);
     }
 
@@ -899,17 +927,28 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // 1. Submit host code (Tenant -> Landlord)
   const submitHostCode = (code: string, tenantId: string, requestedRoomId?: string) => {
     const cleanCode = code.trim().toUpperCase();
-    // Check if code matches landlord
-    if (cleanCode !== settings.hostCode.toUpperCase()) {
-      return { success: false, message: 'Mã chủ trọ không hợp lệ! Vui lòng kiểm tra lại mã 10 ký tự do chủ nhà cung cấp.' };
+    
+    // Find matching landlord across users or current settings
+    const targetLandlord = users.find(
+      (u) => u.role === 'landlord' && u.hostCode && u.hostCode.trim().toUpperCase() === cleanCode
+    ) || (settings.hostCode && settings.hostCode.trim().toUpperCase() === cleanCode ? users.find((u) => u.id === settings.landlordId) || (currentUser.role === 'landlord' ? currentUser : undefined) : undefined);
+
+    if (!targetLandlord) {
+      return { 
+        success: false, 
+        message: 'Mã chủ trọ không tồn tại hoặc không hợp lệ! Vui lòng kiểm tra lại mã do chủ nhà trọ cung cấp.' 
+      };
     }
 
     const tenant = users.find((u) => u.id === tenantId);
     if (!tenant) return { success: false, message: 'Không tìm thấy người dùng' };
 
+    const targetLandlordId = targetLandlord.id;
+    const targetLandlordName = targetLandlord.name;
+
     // Check if already requested
     const existing = joinRequests.find(
-      (r) => r.tenantId === tenantId && r.landlordId === settings.landlordId && r.status === 'pending'
+      (r) => r.tenantId === tenantId && r.landlordId === targetLandlordId && r.status === 'pending'
     );
     if (existing) {
       return { success: true, message: 'Bạn đã gửi yêu cầu gia nhập trước đó. Vui lòng chờ chủ trọ duyệt!' };
@@ -923,7 +962,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       tenantIdCard: tenant.idCard || '038200019283',
       tenantEmail: tenant.email,
       hostCodeInput: cleanCode,
-      landlordId: settings.landlordId,
+      landlordId: targetLandlordId,
       roomIdRequested: requestedRoomId || 'Chưa chọn phòng',
       status: 'pending',
       createdAt: new Date().toLocaleString('vi-VN'),
@@ -937,8 +976,8 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       id: `notif_${Date.now()}`,
       senderId: tenant.id,
       senderName: tenant.name,
-      receiverId: settings.landlordId,
-      landlordId: settings.landlordId,
+      receiverId: targetLandlordId,
+      landlordId: targetLandlordId,
       type: 'tenant_join_request',
       title: 'Đơn xin thuê trọ mới',
       message: `Khách thuê ${tenant.name} (${tenant.phone}) vừa nhập đúng mã chủ trọ và gửi yêu cầu thuê phòng.`,
@@ -951,7 +990,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     return {
       success: true,
-      message: `Đã gửi yêu cầu kết nối tới Chủ trọ ${settings.houseName}. Đang chờ chủ nhà xác nhận duyệt.`,
+      message: `Đã gửi yêu cầu kết nối tới Chủ trọ ${targetLandlordName}. Đang chờ chủ nhà xác nhận duyệt.`,
     };
   };
 
@@ -1501,11 +1540,12 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // 4. Room operations
   const addRoom = (roomData: Omit<Room, 'id' | 'landlordId' | 'doorLockState' | 'securityStatus'>) => {
+    const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
     const newRoomId = `room_${Date.now()}`;
     const newRoom: Room = {
       ...roomData,
       id: newRoomId,
-      landlordId: settings.landlordId,
+      landlordId: targetLandlordId,
       doorLockState: 'locked',
       securityStatus: 'secure',
       doorPasscode: Math.floor(100000 + Math.random() * 900000).toString(),
@@ -1562,9 +1602,11 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // 5. Pricing Update & Automatic Broadcast
   const updatePricing = (updates: Partial<LandlordSettings>, sendBroadcastNotice = true) => {
+    const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
     const oldSettings = { ...settings };
-    const newSettings = { ...settings, ...updates };
+    const newSettings = { ...settings, ...updates, landlordId: targetLandlordId };
     setSettings(newSettings);
+    localStorage.setItem(`${STORAGE_KEY}_settings_${targetLandlordId}`, JSON.stringify(newSettings));
     saveSettingsToFirestore(newSettings);
 
     if (sendBroadcastNotice) {
@@ -1594,12 +1636,13 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const broadcastNotice = (title: string, message: string, priority: 'normal' | 'high' | 'urgent' = 'normal') => {
+    const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
     const notif: AppNotification = {
       id: `notif_${Date.now()}`,
       senderId: currentUser.id,
       senderName: currentUser.name,
       receiverId: 'all_tenants',
-      landlordId: settings.landlordId,
+      landlordId: targetLandlordId,
       type: 'general',
       title,
       message,
@@ -1625,6 +1668,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     extraFeeReason: string;
     applyToAllRooms?: boolean;
   }) => {
+    const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
     const targetRooms = applyToAllRooms ? rooms.filter((r) => r.status === 'occupied') : rooms.filter((r) => r.id === roomId);
 
     targetRooms.forEach((rm) => {
@@ -1644,7 +1688,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const newInv: Invoice = {
         id: `inv_${Date.now()}_${rm.id}`,
         invoiceCode: `HD-${monthYear.replace('/', '')}-${rm.roomNumber.replace(/\D/g, '')}`,
-        landlordId: settings.landlordId,
+        landlordId: targetLandlordId,
         tenantId: tenant?.id || 'user_tenant_1',
         tenantName: tenant?.name || 'Khách thuê',
         roomId: rm.id,
@@ -1688,10 +1732,10 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (tenant) {
         const notif: AppNotification = {
           id: `notif_${Date.now()}_${rm.id}`,
-          senderId: settings.landlordId,
+          senderId: targetLandlordId,
           senderName: `Chủ trọ ${getLandlordName()}`,
           receiverId: tenant.id,
-          landlordId: settings.landlordId,
+          landlordId: targetLandlordId,
           type: 'invoice_ready',
           title: `Hóa đơn mới: Kỳ ${monthYear} - ${rm.roomNumber}`,
           message: `Hóa đơn đã được phát hành với tổng tiền ${total.toLocaleString('vi-VN')} đ. ${extraFee > 0 ? `(Gồm phí phát sinh: ${extraFeeReason} - ${extraFee.toLocaleString('vi-VN')} đ)` : ''}`,
@@ -1707,6 +1751,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // 7. AI Batch Invoices Generator
   const generateAIInvoicesBatch = () => {
+    const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
     const monthYear = `${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`;
     const occupiedRooms = rooms.filter((r) => r.status === 'occupied');
     let totalSum = 0;
@@ -1730,7 +1775,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       return {
         id: `inv_ai_${Date.now()}_${rm.id}`,
         invoiceCode: `AI-${monthYear.replace('/', '')}-${rm.roomNumber.replace(/\D/g, '')}`,
-        landlordId: settings.landlordId,
+        landlordId: targetLandlordId,
         tenantId: tenant?.id || 'user_tenant_1',
         tenantName: tenant?.name || 'Khách thuê',
         roomId: rm.id,
@@ -1787,6 +1832,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (!inv) return;
 
     const isMultiMonth = prepaidMonths > 1;
+    const targetLandlordId = inv.landlordId || (currentUser.role === 'tenant' ? currentUser.landlordId : undefined) || settings.landlordId;
 
     const updatedInv: Invoice = {
       ...inv,
@@ -1835,8 +1881,8 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         id: `notif_${Date.now()}`,
         senderId: currentUser.id,
         senderName: currentUser.name,
-        receiverId: settings.landlordId,
-        landlordId: settings.landlordId,
+        receiverId: targetLandlordId,
+        landlordId: targetLandlordId,
         type: 'prepayment_notice',
         title: 'Khách thanh toán trước tiền phòng nhiều tháng',
         message: `Người thuê ${inv.tenantName} (${inv.roomNumber}) đã đóng tiền phòng trước ${prepaidMonths} tháng. Hệ thống đã ghi nhận và sẽ tự động miễn tính tiền phòng trong các kỳ tới (chỉ xuất hóa đơn điện/nước/sinh hoạt).`,
@@ -1852,8 +1898,8 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         id: `notif_${Date.now()}`,
         senderId: currentUser.id,
         senderName: currentUser.name,
-        receiverId: settings.landlordId,
-        landlordId: settings.landlordId,
+        receiverId: targetLandlordId,
+        landlordId: targetLandlordId,
         type: 'payment_received',
         title: 'Khách thuê đã chuyển khoản thanh toán',
         message: `Khách thuê ${inv.tenantName} (${inv.roomNumber}) đã thanh toán thành công hóa đơn ${inv.invoiceCode} số tiền ${inv.totalAmount.toLocaleString('vi-VN')} đ qua VietQR. Vui lòng bấm xác nhận.`,
@@ -1890,10 +1936,11 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // 9. Smart Security & Remote Locks
   const addSecurityLog = (log: Omit<SecurityEventLog, 'id' | 'timestamp' | 'landlordId'>) => {
+    const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (currentUser.landlordId || settings.landlordId || 'main');
     const newLog: SecurityEventLog = {
       ...log,
       id: `sec_${Date.now()}`,
-      landlordId: settings.landlordId,
+      landlordId: targetLandlordId,
       timestamp: new Date().toLocaleString('vi-VN'),
     };
     setSecurityLogs((prev) => [newLog, ...prev]);
@@ -2049,12 +2096,13 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     photos?: string[];
   }) => {
     const room = rooms.find((r) => r.id === currentUser.roomId) || rooms[0] || { id: 'room_custom', roomNumber: 'Phòng thuê' };
+    const targetLandlordId = currentUser.landlordId || (room as Room).landlordId || settings.landlordId || 'main';
     const newIssue: IssueTicket = {
       id: `issue_${Date.now()}`,
       ticketCode: `SC-${Math.floor(1000 + Math.random() * 9000)}`,
       tenantId: currentUser.id,
       tenantName: currentUser.name,
-      landlordId: settings.landlordId,
+      landlordId: targetLandlordId,
       roomId: room.id,
       roomNumber: room.roomNumber,
       category: data.category,
@@ -2074,8 +2122,8 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       id: `notif_${Date.now()}`,
       senderId: currentUser.id,
       senderName: currentUser.name,
-      receiverId: settings.landlordId,
-      landlordId: settings.landlordId,
+      receiverId: targetLandlordId,
+      landlordId: targetLandlordId,
       type: 'maintenance',
       title: `Báo cáo sự cố mới: ${room.roomNumber}`,
       message: `${currentUser.name} báo cáo: ${data.title} (Mức độ: ${data.urgency === 'critical' ? 'Khẩn cấp' : data.urgency === 'high' ? 'Cao' : 'Bình thường'}).`,
@@ -2113,13 +2161,14 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     );
 
     if (issue) {
+      const targetLandlordId = issue.landlordId || (currentUser.role === 'landlord' ? currentUser.id : settings.landlordId);
       const statusText = status === 'resolved' ? 'Đã xử lý khắc phục xong' : status === 'in_progress' ? 'Đang tiến hành sửa chữa' : 'Đã tiếp nhận';
       const notif: AppNotification = {
         id: `notif_${Date.now()}`,
-        senderId: settings.landlordId,
+        senderId: targetLandlordId,
         senderName: `Chủ trọ ${getLandlordName()}`,
         receiverId: issue.tenantId,
-        landlordId: settings.landlordId,
+        landlordId: targetLandlordId,
         type: 'maintenance',
         title: `Cập nhật xử lý sự cố [${issue.ticketCode}]`,
         message: `Chủ nhà đã cập nhật trạng thái: ${statusText}. ${landlordNote ? `Ghi chú: ${landlordNote}` : ''}`,
@@ -2339,6 +2388,18 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const updated = { ...prev, ...updates };
       setUsers((uList) => uList.map((u) => (u.id === prev.id ? updated : u)));
       saveUserToFirestore(updated);
+
+      if (prev.role === 'landlord' && (updates.houseName || updates.houseAddress)) {
+        const newSettings = {
+          ...settings,
+          ...(updates.houseName ? { houseName: updates.houseName.trim() } : {}),
+          ...(updates.houseAddress ? { houseAddress: updates.houseAddress.trim() } : {}),
+        };
+        setSettings(newSettings);
+        localStorage.setItem(`${STORAGE_KEY}_settings_${prev.id}`, JSON.stringify(newSettings));
+        saveSettingsToFirestore(newSettings);
+      }
+
       return updated;
     });
   };
@@ -2456,6 +2517,39 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return securityLogs;
   }, [securityLogs, currentUser]);
 
+  const currentHouseName = React.useMemo(() => {
+    if (currentUser.role === 'admin') {
+      return 'Quản Trị Hệ Thống';
+    }
+    if (currentUser.role === 'landlord') {
+      if (settings.houseName && settings.houseName !== 'Dãy Trọ Của Tôi') {
+        return settings.houseName;
+      }
+      return currentUser.houseName || (currentUser.name ? `Dãy Trọ ${currentUser.name}` : 'Dãy Trọ');
+    }
+    if (currentUser.role === 'tenant') {
+      if (!currentUser.landlordId) {
+        const pendingReq = joinRequests.find(
+          (r) => (r.tenantId === currentUser.id || (currentUser.phone && r.tenantPhone === currentUser.phone)) && r.status === 'pending'
+        );
+        if (pendingReq && pendingReq.landlordId) {
+          const l = users.find((u) => u.id === pendingReq.landlordId);
+          if (settings.houseName && settings.houseName !== 'Dãy Trọ Của Tôi') {
+            return settings.houseName;
+          }
+          return l?.houseName || (l?.name ? `Dãy Trọ ${l.name}` : 'Dãy Trọ Đang Chờ Duyệt');
+        }
+        return 'Chưa kết nối trọ';
+      }
+      if (settings.houseName && settings.houseName !== 'Dãy Trọ Của Tôi') {
+        return settings.houseName;
+      }
+      const landlord = users.find((u) => u.id === currentUser.landlordId);
+      return landlord?.houseName || (landlord?.name ? `Dãy Trọ ${landlord.name}` : 'Dãy Trọ');
+    }
+    return settings.houseName || 'Dãy Trọ';
+  }, [currentUser, settings.houseName, joinRequests, users]);
+
   return (
     <RentalContext.Provider
       value={{
@@ -2469,6 +2563,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         users: filteredUsers,
         switchUserById,
         switchRoleQuick,
+        currentHouseName,
         settings,
         rooms: filteredRooms,
         contracts: filteredContracts,

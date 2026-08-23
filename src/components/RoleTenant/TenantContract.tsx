@@ -14,7 +14,7 @@ interface TenantContractProps {
 }
 
 export const TenantContract: React.FC<TenantContractProps> = ({ onNavigateTab }) => {
-  const { currentUser, rooms, contracts, settings, joinRequests } = useRental();
+  const { currentUser, rooms, contracts, settings, currentHouseName, joinRequests } = useRental();
 
   const myContractMatch = contracts?.find(
     (c) => (c.tenantId === currentUser.id || (currentUser.phone && c.tenantPhone === currentUser.phone)) && c.status === 'active'
@@ -67,7 +67,7 @@ export const TenantContract: React.FC<TenantContractProps> = ({ onNavigateTab })
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Dãy trọ:</span>
-              <span className="font-semibold text-slate-900">{settings?.houseName || 'Nhà trọ Quản lí nhà trọ'}</span>
+              <span className="font-semibold text-slate-900">{currentHouseName}</span>
             </div>
           </div>
 
@@ -211,7 +211,7 @@ export const TenantContract: React.FC<TenantContractProps> = ({ onNavigateTab })
               <Building className="w-4 h-4 text-teal-600" /> BÊN CHO THUÊ (BÊN A)
             </div>
             <div><strong>Chủ nhà:</strong> {contract.landlordName || settings.accountName || 'Chủ trọ'}</div>
-            <div><strong>Dãy trọ:</strong> {settings.houseName}</div>
+            <div><strong>Dãy trọ:</strong> {currentHouseName}</div>
             <div><strong>Địa chỉ:</strong> {settings.houseAddress}</div>
             <div><strong>Mã chủ trọ:</strong> <span className="font-mono font-bold text-teal-700">{settings.hostCode}</span></div>
           </div>

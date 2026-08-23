@@ -13,7 +13,7 @@ interface TenantMetersProps {
 }
 
 export const TenantMeters: React.FC<TenantMetersProps> = ({ onNavigateTab }) => {
-  const { currentUser, rooms, telemetry, settings, contracts, joinRequests } = useRental();
+  const { currentUser, rooms, telemetry, settings, currentHouseName, contracts, joinRequests } = useRental();
 
   const myContractMatch = contracts?.find(
     (c) => (c.tenantId === currentUser.id || (currentUser.phone && c.tenantPhone === currentUser.phone)) && c.status === 'active'
@@ -66,7 +66,7 @@ export const TenantMeters: React.FC<TenantMetersProps> = ({ onNavigateTab }) => 
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Dãy trọ:</span>
-              <span className="font-semibold text-slate-900">{settings.houseName || 'Nhà trọ Quản lí nhà trọ'}</span>
+              <span className="font-semibold text-slate-900">{currentHouseName}</span>
             </div>
           </div>
 

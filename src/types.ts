@@ -14,6 +14,8 @@ export interface User {
   joinedAt: string;
   hostCode?: string; // 10-character code for landlord (e.g., HOST98AB12)
   landlordId?: string; // for tenant, points to their landlord
+  houseName?: string; // Tên riêng của dãy trọ (ví dụ: Trọ 1, Trọ 2, Dãy Trọ Hoa Mai,...)
+  houseAddress?: string; // Địa chỉ dãy trọ
   roomId?: string; // for tenant, points to the rented room
   licenseTier?: 'standard' | 'pro' | 'enterprise';
   token?: string;

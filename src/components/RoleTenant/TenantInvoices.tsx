@@ -19,7 +19,7 @@ interface TenantInvoicesProps {
 }
 
 export const TenantInvoices: React.FC<TenantInvoicesProps> = ({ onNavigateTab }) => {
-  const { currentUser, rooms, invoices, contracts, joinRequests, settings } = useRental();
+  const { currentUser, rooms, invoices, contracts, joinRequests, settings, currentHouseName } = useRental();
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'paid'>('all');
 
@@ -74,7 +74,7 @@ export const TenantInvoices: React.FC<TenantInvoicesProps> = ({ onNavigateTab })
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Dãy trọ:</span>
-              <span className="font-semibold text-slate-900">{settings?.houseName || 'Nhà trọ Quản lí nhà trọ'}</span>
+              <span className="font-semibold text-slate-900">{currentHouseName}</span>
             </div>
           </div>
 

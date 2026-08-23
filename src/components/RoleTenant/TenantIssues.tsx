@@ -18,7 +18,7 @@ interface TenantIssuesProps {
 }
 
 export const TenantIssues: React.FC<TenantIssuesProps> = ({ onNavigateTab }) => {
-  const { currentUser, rooms, issues, createIssue, contracts, joinRequests, settings } = useRental();
+  const { currentUser, rooms, issues, createIssue, contracts, joinRequests, settings, currentHouseName } = useRental();
 
   const myContractMatch = contracts?.find(
     (c) => (c.tenantId === currentUser.id || (currentUser.phone && c.tenantPhone === currentUser.phone)) && c.status === 'active'
@@ -71,7 +71,7 @@ export const TenantIssues: React.FC<TenantIssuesProps> = ({ onNavigateTab }) => 
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Dãy trọ:</span>
-              <span className="font-semibold text-slate-900">{settings?.houseName || 'Nhà trọ Quản lí nhà trọ'}</span>
+              <span className="font-semibold text-slate-900">{currentHouseName}</span>
             </div>
           </div>
 

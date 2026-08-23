@@ -32,6 +32,7 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onNavigateTab 
     telemetry, 
     toggleRoomDoor, 
     settings,
+    currentHouseName,
     issues,
     joinRequests
   } = useRental();
@@ -93,7 +94,7 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onNavigateTab 
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Dãy trọ:</span>
-              <span className="font-semibold text-slate-900">{settings.houseName || 'Nhà trọ Quản lí nhà trọ'}</span>
+              <span className="font-semibold text-slate-900">{currentHouseName}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Phòng đăng ký:</span>
@@ -212,7 +213,7 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onNavigateTab 
             </span>
           </div>
           <p className="text-sm text-slate-500 mt-0.5">
-            Dãy trọ {settings.houseName} • Tầng {myRoom.floor} ({myRoom.areaM2}m²)
+            Dãy trọ {currentHouseName} • Tầng {myRoom.floor} ({myRoom.areaM2}m²)
           </p>
         </div>
 

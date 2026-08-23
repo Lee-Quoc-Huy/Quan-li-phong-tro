@@ -11,7 +11,8 @@ import { AIInsightCard } from '../Common/AIInsightCard';
 export const LandlordMeters: React.FC = () => {
   const { rooms, telemetry } = useRental();
 
-  const telList = Object.values(telemetry) as RealtimeTelemetry[];
+  const roomIds = new Set(rooms.map((r) => r.id));
+  const telList = (Object.values(telemetry) as RealtimeTelemetry[]).filter((t) => roomIds.has(t.roomId));
   const totalCurrentWatts = telList.reduce((acc, t) => acc + (t.powerWatts || 0), 0);
   const totalWaterLpm = telList.reduce((acc, t) => acc + (t.waterFlowRateLpm || 0), 0);
 

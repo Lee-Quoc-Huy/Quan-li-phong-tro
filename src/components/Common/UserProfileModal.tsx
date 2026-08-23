@@ -28,11 +28,13 @@ const PRESET_AVATARS = [
 ];
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser, updateUserProfile } = useRental();
+  const { currentUser, settings, updateUserProfile } = useRental();
 
   const [name, setName] = useState(currentUser.name || '');
   const [email, setEmail] = useState(currentUser.email || '');
   const [phone, setPhone] = useState(currentUser.phone || '');
+  const [houseName, setHouseName] = useState(currentUser.houseName || settings.houseName || '');
+  const [houseAddress, setHouseAddress] = useState(currentUser.houseAddress || settings.houseAddress || '');
   const [age, setAge] = useState<number | ''>(currentUser.age ?? 25);
   const [avatar, setAvatar] = useState(currentUser.avatar || PRESET_AVATARS[0]);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -62,6 +64,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
       name: name.trim(),
       email: email.trim(),
       phone: phone.trim(),
+      houseName: currentUser.role === 'landlord' ? houseName.trim() : undefined,
+      houseAddress: currentUser.role === 'landlord' ? houseAddress.trim() : undefined,
       age: age === '' ? undefined : Number(age),
       avatar: avatar.trim(),
     });
@@ -238,6 +242,36 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
               />
             </div>
           </div>
+
+          {/* Landlord Specific: House Name & Address */}
+          {currentUser.role === 'landlord' && (
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3">
+              <div className="text-xs font-bold text-amber-300">
+                Thông tin Dãy Trọ của bạn (Hiển thị cho khách thuê & tiêu đề):
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300">Tên Dãy Trọ:</label>
+                <input
+                  type="text"
+                  required
+                  value={houseName}
+                  onChange={(e) => setHouseName(e.target.value)}
+                  placeholder="Ví dụ: Trọ 1, Trọ 2, Nhà Trọ Hoa Mai,..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-200 text-xs font-bold focus:outline-none focus:border-amber-400"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300">Địa chỉ Dãy Trọ:</label>
+                <input
+                  type="text"
+                  value={houseAddress}
+                  onChange={(e) => setHouseAddress(e.target.value)}
+                  placeholder="Ví dụ: 123 Nguyễn Văn Cừ, Quận 5, TP.HCM"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-amber-400"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">

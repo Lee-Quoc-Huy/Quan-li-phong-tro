@@ -50,6 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     switchRoleQuick, 
     logout,
     settings, 
+    currentHouseName,
     joinRequests, 
     issues, 
     invoices, 
@@ -152,13 +153,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <AppLogo className="w-full h-full" color="#2563eb" />
             </div>
             <div>
-              <div className="font-bold text-slate-900 text-sm leading-tight uppercase">
-                Hệ Thống Quản Lý Trọ
+              <div className="font-bold text-slate-900 text-sm leading-tight uppercase truncate max-w-[150px]">
+                {currentUser.role === 'admin' 
+                  ? 'Quản Trị Hệ Thống' 
+                  : (currentUser.role === 'tenant' && !currentUser.landlordId) 
+                    ? 'Chưa kết nối trọ' 
+                    : currentHouseName}
               </div>
               <div className="text-[11px] text-slate-500 font-medium">
-                {currentUser.role === 'tenant' && !currentUser.landlordId
-                  ? 'Chưa kết nối trọ'
-                  : settings.houseName}
+                {currentUser.role === 'admin'
+                  ? 'Quản trị viên'
+                  : (currentUser.role === 'tenant' && !currentUser.landlordId)
+                    ? 'Vui lòng nhập mã để kết nối'
+                    : 'Hệ Thống Quản Lý Trọ'}
               </div>
             </div>
           </div>

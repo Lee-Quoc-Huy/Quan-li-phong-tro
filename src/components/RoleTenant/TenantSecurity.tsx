@@ -18,7 +18,7 @@ interface TenantSecurityProps {
 }
 
 export const TenantSecurity: React.FC<TenantSecurityProps> = ({ onNavigateTab }) => {
-  const { currentUser, rooms, toggleRoomDoor, changeRoomDoorPIN, securityLogs, settings, contracts, joinRequests } = useRental();
+  const { currentUser, rooms, toggleRoomDoor, changeRoomDoorPIN, securityLogs, settings, currentHouseName, contracts, joinRequests } = useRental();
 
   const myContractMatch = contracts?.find(
     (c) => (c.tenantId === currentUser.id || (currentUser.phone && c.tenantPhone === currentUser.phone)) && c.status === 'active'
@@ -71,7 +71,7 @@ export const TenantSecurity: React.FC<TenantSecurityProps> = ({ onNavigateTab })
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Dãy trọ:</span>
-              <span className="font-semibold text-slate-900">{settings?.houseName || 'Nhà trọ Quản lí nhà trọ'}</span>
+              <span className="font-semibold text-slate-900">{currentHouseName}</span>
             </div>
           </div>
 
@@ -322,7 +322,7 @@ export const TenantSecurity: React.FC<TenantSecurityProps> = ({ onNavigateTab })
             <div className="space-y-1.5 max-h-32 overflow-y-auto">
               {roomLogs.slice(0, 3).map((l) => (
                 <div key={l.id} className="p-2 rounded-lg bg-slate-50 text-[11px] flex items-center justify-between text-slate-600">
-                  <span>{l.description}</span>
+                  <span>{l.note || l.action}</span>
                   <span className="text-slate-400 font-mono text-[10px]">{l.timestamp}</span>
                 </div>
               ))}

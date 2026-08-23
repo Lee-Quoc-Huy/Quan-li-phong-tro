@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 export const TenantJoinHost: React.FC = () => {
-  const { currentUser, settings, submitHostCode, joinRequests, rooms } = useRental();
+  const { currentUser, settings, currentHouseName, submitHostCode, joinRequests, rooms } = useRental();
   const [code, setCode] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -57,7 +57,7 @@ export const TenantJoinHost: React.FC = () => {
                 Trạng thái: ĐÃ LIÊN KẾT THÀNH CÔNG
               </div>
               <h2 className="text-base font-bold text-slate-900 mt-0.5">
-                Khách trọ: <span className="text-teal-700">{currentUser.name}</span> đang thuê trọ tại <span className="text-teal-700">{settings.houseName}</span>
+                Khách trọ: <span className="text-teal-700">{currentUser.name}</span> đang thuê trọ tại <span className="text-teal-700">{currentHouseName}</span>
               </h2>
             </div>
           </div>

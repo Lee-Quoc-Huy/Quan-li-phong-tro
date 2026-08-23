@@ -28,6 +28,7 @@ export const Header: React.FC = () => {
     switchUserById, 
     switchRoleQuick, 
     settings, 
+    currentHouseName,
     joinRequests,
     unreadNotifsCount,
     resetAllData,
@@ -68,16 +69,22 @@ export const Header: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-slate-100 text-base tracking-tight uppercase">
-                    Hệ Thống Quản Lý Trọ
+                    {currentUser.role === 'admin' 
+                      ? 'Quản Trị Hệ Thống' 
+                      : (currentUser.role === 'tenant' && !currentUser.landlordId) 
+                        ? 'Chưa kết nối trọ' 
+                        : currentHouseName}
                   </span>
                   <span className="hidden md:inline-flex text-[9px] font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
                     Trực Tuyến
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-400 font-medium">
-                  {currentUser.role === 'tenant' && !currentUser.landlordId
-                    ? 'Chưa kết nối trọ'
-                    : settings.houseName}
+                  {currentUser.role === 'admin'
+                    ? 'Hệ thống quản trị trực tuyến'
+                    : (currentUser.role === 'tenant' && !currentUser.landlordId)
+                      ? 'Vui lòng nhập mã để kết nối'
+                      : 'Hệ Thống Quản Lý Trọ'}
                 </div>
               </div>
             </div>

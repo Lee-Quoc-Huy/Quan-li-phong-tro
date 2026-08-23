@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRental } from '../../context/RentalContext';
 import { 
   DollarSign, 
@@ -14,7 +14,9 @@ import {
   ExternalLink,
   ShieldCheck,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Building,
+  MapPin
 } from 'lucide-react';
 
 export const LandlordPricing: React.FC = () => {
@@ -28,11 +30,23 @@ export const LandlordPricing: React.FC = () => {
     updateGoogleSheetSettings
   } = useRental();
 
+  const [houseName, setHouseName] = useState(settings.houseName || '');
+  const [houseAddress, setHouseAddress] = useState(settings.houseAddress || '');
   const [electricityRate, setElectricityRate] = useState(settings.electricityRate);
   const [waterRate, setWaterRate] = useState(settings.waterRate);
   const [garbageFee, setGarbageFee] = useState(settings.garbageFee);
   const [internetFee, setInternetFee] = useState(settings.internetFee);
   const [serviceFee, setServiceFee] = useState(settings.serviceFee);
+
+  useEffect(() => {
+    setHouseName(settings.houseName || '');
+    setHouseAddress(settings.houseAddress || '');
+    setElectricityRate(settings.electricityRate);
+    setWaterRate(settings.waterRate);
+    setGarbageFee(settings.garbageFee);
+    setInternetFee(settings.internetFee);
+    setServiceFee(settings.serviceFee);
+  }, [settings]);
 
   // Google Sheet Webhook states
   const [webhookUrl, setWebhookUrl] = useState(
@@ -51,6 +65,8 @@ export const LandlordPricing: React.FC = () => {
   const handleSavePricing = (e: React.FormEvent) => {
     e.preventDefault();
     updatePricing({
+      houseName: houseName.trim() || settings.houseName,
+      houseAddress: houseAddress.trim() || settings.houseAddress,
       electricityRate: Number(electricityRate),
       waterRate: Number(waterRate),
       garbageFee: Number(garbageFee),
@@ -238,11 +254,35 @@ export const LandlordPricing: React.FC = () => {
         {/* Pricing Configuration Form */}
         <form onSubmit={handleSavePricing} className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-2xs space-y-4 text-xs">
           <h2 className="font-bold text-slate-900 text-sm flex items-center gap-2 pb-2 border-b border-slate-100">
-            <DollarSign className="w-4 h-4 text-teal-600" />
-            Biểu Phí Điện, Nước & Dịch Vụ
+            <Building className="w-4 h-4 text-teal-600" />
+            Thông Tin Dãy Trọ & Biểu Phí Dịch Vụ
           </h2>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3 p-3 bg-teal-50/50 rounded-xl border border-teal-100">
+            <div className="space-y-1">
+              <label className="text-slate-700 font-semibold block">Tên Dãy Trọ của bạn:</label>
+              <input
+                type="text"
+                required
+                value={houseName}
+                onChange={(e) => setHouseName(e.target.value)}
+                placeholder="Ví dụ: Trọ 1, Nhà Trọ Hoa Mai, ..."
+                className="w-full px-3 py-2 rounded-xl bg-white border border-teal-300 text-slate-900 font-semibold outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-slate-700 font-semibold block">Địa chỉ Dãy Trọ:</label>
+              <input
+                type="text"
+                value={houseAddress}
+                onChange={(e) => setHouseAddress(e.target.value)}
+                placeholder="Số 123 Đường Số 1, Quận 9, TP.HCM"
+                className="w-full px-3 py-2 rounded-xl bg-white border border-teal-200 text-slate-900 outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 pt-1">
             <div className="space-y-1">
               <label className="text-slate-700 font-semibold block">Giá Điện (VNĐ / kWh):</label>
               <input

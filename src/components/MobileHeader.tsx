@@ -12,7 +12,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   onToggleSidebar,
   onOpenNotifications,
 }) => {
-  const { currentUser, settings, joinRequests, unreadNotifsCount, logout, regenerateHostCode } = useRental();
+  const { currentUser, settings, currentHouseName, joinRequests, unreadNotifsCount, logout, regenerateHostCode } = useRental();
   const [copiedCode, setCopiedCode] = useState(false);
 
   const handleCopyHostCode = () => {
@@ -50,7 +50,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                 ? 'Quản Trị Hệ Thống' 
                 : (currentUser.role === 'tenant' && !currentUser.landlordId) 
                   ? 'Chưa kết nối trọ' 
-                  : settings.houseName || 'Nhà Trọ'}
+                  : currentHouseName}
             </div>
             <div className="text-[10px] text-slate-500 font-medium truncate flex items-center gap-1 mt-0.5">
               <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 text-[9px] font-bold uppercase">
