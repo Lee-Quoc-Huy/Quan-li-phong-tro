@@ -943,6 +943,18 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [users, currentUser.id, currentUser.role, isAuthenticated]);
 
+  // Bộ đếm tự động đồng bộ Google Sheet mỗi 5 phút (300 giây) nếu chủ trọ bật đồng bộ
+  useEffect(() => {
+    if (!isAuthenticated || currentUser.role !== 'landlord') return;
+    if (!settings.googleSheetWebhookUrl || settings.googleSheetSyncEnabled === false) return;
+
+    const interval = setInterval(() => {
+      syncAllTenantsToGoogleSheet();
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, currentUser.role, settings.googleSheetWebhookUrl, settings.googleSheetSyncEnabled]);
+
   const switchUserById = (userId: string) => {
     const found = users.find((u) => u.id === userId);
     if (found) {
@@ -1029,49 +1041,95 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Google Sheet Webhook Sync Dispatcher
   const syncToGoogleSheet = async (
-    action: 'ADD' | 'DELETE' | 'UPDATE',
-    tenantData: {
-      id: string;
+    action: 'ADD' | 'DELETE' | 'UPDATE' | 'sync_all' | 'new_contract',
+    tenantData?: {
+      id?: string;
       roomNumber?: string;
+      tenantName?: string;
       name?: string;
       phone?: string;
+      identityCard?: string;
       idCard?: string;
       startDate?: string;
+      endDate?: string;
       monthlyRent?: number;
+      price?: number;
       depositAmount?: number;
-    }
+      deposit?: number;
+      status?: string;
+    },
+    allTenantsData?: Array<{
+      roomNumber: string;
+      tenantName: string;
+      phone: string;
+      identityCard: string;
+      startDate: string;
+      endDate: string;
+      price: number;
+      deposit: number;
+      status: string;
+    }>
   ): Promise<{ success: boolean; message: string }> => {
-    const webhookUrl = settings.googleSheetWebhookUrl || 'https://script.google.com/macros/s/AKfycbyi1xXWGQy3nEBzEuO-essoeids5-5Uecz9TuTeSclxc6rRPO_foQ78BT1lpsxeO6Ig/exec';
+    const webhookUrl = settings.googleSheetWebhookUrl;
+    if (!webhookUrl || !webhookUrl.trim()) {
+      return { success: false, message: 'Chưa cấu hình Google Apps Script Webhook URL trong Cài đặt' };
+    }
     
-    if (settings.googleSheetSyncEnabled === false && action !== 'UPDATE') {
+    if (settings.googleSheetSyncEnabled === false && action !== 'UPDATE' && action !== 'sync_all') {
       return { success: false, message: 'Tính năng đồng bộ Google Sheet đang tắt trong cài đặt' };
     }
 
     try {
-      await fetch(webhookUrl, {
+      const payload: Record<string, unknown> = {
+        action,
+        timestamp: new Date().toISOString(),
+      };
+
+      if (action === 'sync_all' && allTenantsData) {
+        payload.data = allTenantsData;
+        payload.tenants = allTenantsData;
+      } else if (tenantData) {
+        // Support standard Apps Script payload structures
+        payload.tenant = tenantData;
+        payload.data = {
+          roomNumber: tenantData.roomNumber || '',
+          tenantName: tenantData.tenantName || tenantData.name || '',
+          phone: tenantData.phone || '',
+          identityCard: tenantData.identityCard || tenantData.idCard || '',
+          startDate: tenantData.startDate || '',
+          endDate: tenantData.endDate || 'Vô thời hạn',
+          price: tenantData.price || tenantData.monthlyRent || 0,
+          deposit: tenantData.deposit || tenantData.depositAmount || 0,
+          status: tenantData.status || 'Đang thuê',
+        };
+      }
+
+      await fetch(webhookUrl.trim(), {
         method: 'POST',
         mode: 'no-cors',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          action,
-          tenant: tenantData,
-          timestamp: new Date().toISOString(),
-        }),
+        body: JSON.stringify(payload),
       });
 
       const nowTime = new Date().toLocaleString('vi-VN');
-      setSettings((prev) => ({
-        ...prev,
+      const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
+      const updatedSettings = {
+        ...settings,
         googleSheetLastSync: nowTime,
-      }));
+      };
+      setSettings(updatedSettings);
+      localStorage.setItem(`${STORAGE_KEY}_settings_${targetLandlordId}`, JSON.stringify(updatedSettings));
+      saveSettingsToFirestore(updatedSettings);
 
       return {
         success: true,
-        message: action === 'ADD' 
-          ? `Đã đồng bộ thông tin khách ${tenantData.name || tenantData.id} sang Google Sheet`
-          : `Đã gửi lệnh xóa khách ${tenantData.id} khỏi Google Sheet`,
+        message: action === 'ADD' || action === 'new_contract'
+          ? `Đã đồng bộ thông tin khách ${tenantData?.name || tenantData?.tenantName || tenantData?.id} sang Google Sheet`
+          : action === 'sync_all'
+          ? `Đã đồng bộ toàn bộ danh sách sang Google Sheet`
+          : `Đã gửi lệnh xóa khách ${tenantData?.id} khỏi Google Sheet`,
       };
     } catch (error) {
       console.error('Lỗi khi gửi webhook sang Google Sheet:', error);
@@ -1089,42 +1147,73 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       return { success: true, count: 0, message: 'Hiện không có khách thuê nào để đồng bộ' };
     }
 
-    let syncedCount = 0;
-    for (const tenant of activeTenants) {
+    const tenantsDataList = activeTenants.map((tenant) => {
       const room = rooms.find((r) => r.id === tenant.roomId);
       const contract = contracts.find((c) => c.roomId === tenant.roomId && c.status === 'active');
-
-      await syncToGoogleSheet('ADD', {
-        id: tenant.id,
+      return {
         roomNumber: room?.roomNumber || 'Phòng ?',
-        name: tenant.name,
+        tenantName: tenant.name,
         phone: tenant.phone,
-        idCard: tenant.idCard || '',
+        identityCard: tenant.idCard || '',
         startDate: contract?.startDate || new Date().toISOString().split('T')[0],
-        monthlyRent: room?.basePrice || 3500000,
-        depositAmount: contract?.depositAmount || room?.basePrice || 3500000,
+        endDate: contract?.endDate || 'Vô thời hạn',
+        price: room?.basePrice || 3500000,
+        deposit: contract?.depositAmount || room?.basePrice || 3500000,
+        status: 'Đang thuê',
+      };
+    });
+
+    // 1. Send batch payload (action: sync_all)
+    await syncToGoogleSheet('sync_all', undefined, tenantsDataList);
+
+    // 2. Also send individual rows (action: ADD) for scripts that listen to single add actions
+    for (const item of tenantsDataList) {
+      await syncToGoogleSheet('ADD', {
+        id: item.phone,
+        roomNumber: item.roomNumber,
+        name: item.tenantName,
+        tenantName: item.tenantName,
+        phone: item.phone,
+        idCard: item.identityCard,
+        identityCard: item.identityCard,
+        startDate: item.startDate,
+        endDate: item.endDate,
+        monthlyRent: item.price,
+        price: item.price,
+        depositAmount: item.deposit,
+        deposit: item.deposit,
+        status: 'Đang thuê',
       });
-      syncedCount++;
     }
 
     const nowTime = new Date().toLocaleString('vi-VN');
-    setSettings((prev) => ({
-      ...prev,
+    const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
+    const updatedSettings = {
+      ...settings,
       googleSheetLastSync: nowTime,
-    }));
+    };
+    setSettings(updatedSettings);
+    localStorage.setItem(`${STORAGE_KEY}_settings_${targetLandlordId}`, JSON.stringify(updatedSettings));
+    saveSettingsToFirestore(updatedSettings);
 
     return {
       success: true,
-      count: syncedCount,
-      message: `Đã đồng bộ thành công ${syncedCount} khách thuê sang Google Sheet!`,
+      count: activeTenants.length,
+      message: `Đã đồng bộ thành công ${activeTenants.length} khách thuê sang Google Sheet!`,
     };
   };
 
   // Test Webhook connection with sample data
   const testGoogleSheetConnection = async (testUrl?: string): Promise<{ success: boolean; message: string }> => {
-    const url = testUrl || settings.googleSheetWebhookUrl || 'https://script.google.com/macros/s/AKfycbyi1xXWGQy3nEBzEuO-essoeids5-5Uecz9TuTeSclxc6rRPO_foQ78BT1lpsxeO6Ig/exec';
+    const url = testUrl || settings.googleSheetWebhookUrl;
+    if (!url || !url.trim()) {
+      return {
+        success: false,
+        message: 'Chưa cấu hình URL Webhook. Vui lòng nhập link Apps Script trước khi kiểm tra.',
+      };
+    }
     try {
-      await fetch(url, {
+      await fetch(url.trim(), {
         method: 'POST',
         mode: 'no-cors',
         headers: {
@@ -1142,18 +1231,34 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             monthlyRent: 3500000,
             depositAmount: 3500000,
           },
+          data: {
+            roomNumber: 'Phòng TEST',
+            tenantName: 'Khách Thử Nghiệm (Quản lí nhà trọ)',
+            phone: '0909 000 888',
+            identityCard: '079201009182',
+            startDate: new Date().toISOString().split('T')[0],
+            endDate: '12 tháng',
+            price: 3500000,
+            deposit: 3500000,
+            status: 'Đang thuê',
+          },
+          timestamp: new Date().toISOString(),
         }),
       });
 
       const nowTime = new Date().toLocaleString('vi-VN');
-      setSettings((prev) => ({
-        ...prev,
+      const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
+      const updatedSettings = {
+        ...settings,
         googleSheetLastSync: nowTime,
-      }));
+      };
+      setSettings(updatedSettings);
+      localStorage.setItem(`${STORAGE_KEY}_settings_${targetLandlordId}`, JSON.stringify(updatedSettings));
+      saveSettingsToFirestore(updatedSettings);
 
       return {
         success: true,
-        message: 'Gửi dữ liệu kiểm tra thành công! Vui lòng kiểm tra tab "KhachThue" trong Google Sheet của bạn.',
+        message: 'Gửi dữ liệu kiểm tra thành công! Vui lòng kiểm tra Google Sheet của bạn xem đã nhận được dòng mới chưa.',
       };
     } catch (err) {
       return {
@@ -1163,13 +1268,18 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  // Update Google Sheet URL & sync status
+  // Update Google Sheet URL & sync status (persist to Firestore & localStorage)
   const updateGoogleSheetSettings = (webhookUrl: string, enabled: boolean) => {
-    setSettings((prev) => ({
-      ...prev,
+    const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
+    const updatedSettings: LandlordSettings = {
+      ...settings,
       googleSheetWebhookUrl: webhookUrl.trim(),
       googleSheetSyncEnabled: enabled,
-    }));
+      landlordId: targetLandlordId,
+    };
+    setSettings(updatedSettings);
+    localStorage.setItem(`${STORAGE_KEY}_settings_${targetLandlordId}`, JSON.stringify(updatedSettings));
+    saveSettingsToFirestore(updatedSettings);
   };
 
   const getLandlordName = () => {
@@ -1210,6 +1320,24 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
     setContracts((prev) => [newContract, ...prev]);
     saveContractToFirestore(newContract);
+
+    // Tự động đồng bộ ngay khi tạo hợp đồng mới
+    syncToGoogleSheet('new_contract', {
+      id: contract.tenantId || contract.tenantPhone,
+      roomNumber: contract.roomNumber,
+      name: contract.tenantName,
+      tenantName: contract.tenantName,
+      phone: contract.tenantPhone,
+      idCard: contract.tenantIdCard,
+      identityCard: contract.tenantIdCard,
+      startDate: contract.startDate,
+      endDate: contract.endDate,
+      monthlyRent: contract.monthlyRent,
+      price: contract.monthlyRent,
+      depositAmount: contract.depositAmount,
+      deposit: contract.depositAmount,
+      status: 'Đang thuê',
+    });
   };
 
   const deleteContract = (contractId: string) => {

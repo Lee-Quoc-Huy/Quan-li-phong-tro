@@ -6,17 +6,21 @@ import {
   Droplet, 
   Wifi, 
   Check, 
-  Send,
-  Bell,
-  Table,
-  FileSpreadsheet,
-  RefreshCw,
-  ExternalLink,
-  ShieldCheck,
-  CheckCircle2,
-  AlertCircle,
-  Building,
-  MapPin
+  Send, 
+  Bell, 
+  Table, 
+  FileSpreadsheet, 
+  RefreshCw, 
+  ExternalLink, 
+  ShieldCheck, 
+  CheckCircle2, 
+  AlertCircle, 
+  Building, 
+  MapPin,
+  HelpCircle,
+  Copy,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 export const LandlordPricing: React.FC = () => {
@@ -38,6 +42,97 @@ export const LandlordPricing: React.FC = () => {
   const [internetFee, setInternetFee] = useState(settings.internetFee);
   const [serviceFee, setServiceFee] = useState(settings.serviceFee);
 
+  // Google Sheet Webhook states
+  const [webhookUrl, setWebhookUrl] = useState(
+    settings.googleSheetWebhookUrl || ''
+  );
+  const [syncEnabled, setSyncEnabled] = useState(settings.googleSheetSyncEnabled !== false);
+  const [isTestingSync, setIsTestingSync] = useState(false);
+  const [isBatchSyncing, setIsBatchSyncing] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<{ success: boolean; message: string } | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const [noticeTitle, setNoticeTitle] = useState('');
+  const [noticeBody, setNoticeBody] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [noticeSentSuccess, setNoticeSentSuccess] = useState(false);
+
+  const appsScriptTemplate = `function doPost(e) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var payload = JSON.parse(e.postData.contents);
+    
+    // Tự động tạo hàng tiêu đề nếu sheet còn trống
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow([
+        "Mã phòng", "Họ và tên khách", "Số điện thoại", "Số CCCD", 
+        "Ngày bắt đầu", "Hạn hợp đồng", "Giá thuê (VNĐ)", "Tiền cọc (VNĐ)", "Trạng thái", "Cập nhật lúc"
+      ]);
+    }
+    
+    // 1. Nếu là lệnh đồng bộ toàn bộ (sync_all)
+    if (payload.action === "sync_all" && payload.data && Array.isArray(payload.data)) {
+      var lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        sheet.deleteRows(2, lastRow - 1);
+      }
+      payload.data.forEach(function(t) {
+        sheet.appendRow([
+          t.roomNumber || "",
+          t.tenantName || t.name || "",
+          t.phone || "",
+          t.identityCard || t.idCard || "---",
+          t.startDate || "",
+          t.endDate || "Vô thời hạn",
+          t.price || t.monthlyRent || 0,
+          t.deposit || t.depositAmount || 0,
+          t.status || "Đang thuê",
+          new Date().toLocaleString("vi-VN")
+        ]);
+      });
+    } 
+    // 2. Nếu là lệnh thêm khách / hợp đồng mới (ADD / new_contract)
+    else if (payload.action === "ADD" || payload.action === "new_contract") {
+      var t = payload.data || payload.tenant || {};
+      sheet.appendRow([
+        t.roomNumber || "",
+        t.tenantName || t.name || "",
+        t.phone || "",
+        t.identityCard || t.idCard || "---",
+        t.startDate || "",
+        t.endDate || "Vô thời hạn",
+        t.price || t.monthlyRent || 0,
+        t.deposit || t.depositAmount || 0,
+        t.status || "Đang thuê",
+        new Date().toLocaleString("vi-VN")
+      ]);
+    }
+    // 3. Nếu là lệnh xóa khách / trả phòng (DELETE)
+    else if (payload.action === "DELETE") {
+      var targetId = payload.tenant ? (payload.tenant.id || payload.tenant.phone) : "";
+      var rows = sheet.getDataRange().getValues();
+      for (var i = rows.length - 1; i >= 1; i--) {
+        if (rows[i][2] == targetId || rows[i][0] == targetId) {
+          sheet.deleteRow(i + 1);
+        }
+      }
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
+
+  const copyAppsScript = () => {
+    navigator.clipboard.writeText(appsScriptTemplate);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 3000);
+  };
+
   useEffect(() => {
     setHouseName(settings.houseName || '');
     setHouseAddress(settings.houseAddress || '');
@@ -46,21 +141,9 @@ export const LandlordPricing: React.FC = () => {
     setGarbageFee(settings.garbageFee);
     setInternetFee(settings.internetFee);
     setServiceFee(settings.serviceFee);
+    setWebhookUrl(settings.googleSheetWebhookUrl || '');
+    setSyncEnabled(settings.googleSheetSyncEnabled !== false);
   }, [settings]);
-
-  // Google Sheet Webhook states
-  const [webhookUrl, setWebhookUrl] = useState(
-    settings.googleSheetWebhookUrl || 'https://script.google.com/macros/s/AKfycbyi1xXWGQy3nEBzEuO-essoeids5-5Uecz9TuTeSclxc6rRPO_foQ78BT1lpsxeO6Ig/exec'
-  );
-  const [syncEnabled, setSyncEnabled] = useState(settings.googleSheetSyncEnabled !== false);
-  const [isTestingSync, setIsTestingSync] = useState(false);
-  const [isBatchSyncing, setIsBatchSyncing] = useState(false);
-  const [syncFeedback, setSyncFeedback] = useState<{ success: boolean; message: string } | null>(null);
-
-  const [noticeTitle, setNoticeTitle] = useState('');
-  const [noticeBody, setNoticeBody] = useState('');
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [noticeSentSuccess, setNoticeSentSuccess] = useState(false);
 
   const handleSavePricing = (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,29 +240,91 @@ export const LandlordPricing: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-bold text-slate-900 text-sm sm:text-base">
-                  Đồng Bộ Google Sheet & Apps Script (Tự Động)
+                  Đồng Bộ Google Sheet Riêng Của Chủ Trọ
                 </h2>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                  Đã Kết Nối
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  webhookUrl ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                }`}>
+                  {webhookUrl ? 'Đã Kết Nối' : 'Chưa Kết Nối'}
                 </span>
               </div>
               <p className="text-xs text-slate-600 mt-0.5">
-                Tự động thêm khách thuê vào Google Sheet khi duyệt và tự động xóa dòng khi hủy hợp đồng / trả phòng.
+                Tự động đẩy thông tin khách thuê sang Google Sheet mỗi 5 phút hoặc ngay khi có hợp đồng mới.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
+              onClick={() => setShowGuide(!showGuide)}
+              className="px-3 py-1.5 rounded-xl bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-800 font-semibold text-xs flex items-center gap-1.5 transition-all shadow-2xs"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>{showGuide ? 'Ẩn hướng dẫn' : 'Xem hướng dẫn cài đặt'}</span>
+              {showGuide ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+
+            <button
               onClick={handleSyncAll}
-              disabled={isBatchSyncing}
+              disabled={isBatchSyncing || !webhookUrl}
               className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold text-xs flex items-center gap-1.5 transition-all shadow-2xs"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isBatchSyncing ? 'animate-spin' : ''}`} />
-              <span>{isBatchSyncing ? 'Đang đồng bộ...' : 'Đồng bộ tất cả'}</span>
+              <span>{isBatchSyncing ? 'Đang đồng bộ...' : 'Đồng bộ ngay'}</span>
             </button>
           </div>
         </div>
+
+        {/* Detailed Guide Accordion */}
+        {showGuide && (
+          <div className="p-4 rounded-xl bg-white border border-emerald-200/90 text-xs text-slate-700 space-y-3 animate-in fade-in">
+            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              Hướng dẫn 3 bước kết nối Google Sheet cá nhân của bạn:
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 space-y-1">
+                <div className="font-bold text-emerald-800">Bước 1: Tạo Google Sheet</div>
+                <p className="text-[11px] text-slate-600">
+                  Mở <b>Google Sheets</b> trên tài khoản cá nhân, tạo một trang tính mới.
+                </p>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 space-y-1">
+                <div className="font-bold text-emerald-800">Bước 2: Dán mã Apps Script</div>
+                <p className="text-[11px] text-slate-600">
+                  Vào <b>Tiện ích mở rộng $\rightarrow$ Apps Script</b>, dán đoạn mã bên dưới rồi bấm <b>Triển khai (Web App)</b> với quyền truy cập <b>"Bất kỳ ai"</b>.
+                </p>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 space-y-1">
+                <div className="font-bold text-emerald-800">Bước 3: Dán link Webhook</div>
+                <p className="text-[11px] text-slate-600">
+                  Dán đường link <code className="text-emerald-700 font-mono">.../exec</code> vào ô bên dưới và bấm <b>Lưu Cấu Hình</b>.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <div className="flex items-center justify-between pb-1">
+                <span className="font-semibold text-slate-800">Mã Google Apps Script (Sẵn sàng sao chép):</span>
+                <button
+                  type="button"
+                  onClick={copyAppsScript}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[11px] font-bold flex items-center gap-1 transition-colors"
+                >
+                  {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-700" /> : <Copy className="w-3.5 h-3.5 text-emerald-700" />}
+                  <span>{copiedCode ? 'Đã sao chép mã!' : 'Sao chép mã Apps Script'}</span>
+                </button>
+              </div>
+              <pre className="p-3 bg-slate-900 text-emerald-300 rounded-lg text-[11px] font-mono overflow-x-auto max-h-48">
+                {appsScriptTemplate}
+              </pre>
+            </div>
+          </div>
+        )}
 
         {syncFeedback && (
           <div className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
@@ -200,7 +345,7 @@ export const LandlordPricing: React.FC = () => {
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <label className="text-slate-700 font-semibold block">
-                Google Apps Script Webhook URL (Bản triển khai web):
+                Google Apps Script Webhook URL (Bản triển khai web của Chủ trọ):
               </label>
               <span className="text-[11px] text-slate-500 font-mono">
                 {settings.googleSheetLastSync ? `Đồng bộ lần cuối: ${settings.googleSheetLastSync}` : 'Chưa đồng bộ'}
@@ -224,15 +369,15 @@ export const LandlordPricing: React.FC = () => {
                 onChange={(e) => setSyncEnabled(e.target.checked)}
                 className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
               />
-              <span className="text-slate-800 font-medium">Bật chế độ tự động gửi dữ liệu khi thêm / xóa khách</span>
+              <span className="text-slate-800 font-medium">Bật tự động đồng bộ mỗi 5 phút và khi phát sinh hợp đồng mới</span>
             </label>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleTestConnection}
-                disabled={isTestingSync}
-                className="px-3 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                disabled={isTestingSync || !webhookUrl}
+                className="px-3 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-colors"
               >
                 <Zap className={`w-3.5 h-3.5 text-amber-500 ${isTestingSync ? 'animate-bounce' : ''}`} />
                 <span>{isTestingSync ? 'Đang kiểm tra...' : 'Kiểm tra kết nối'}</span>
