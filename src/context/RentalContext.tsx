@@ -10,6 +10,12 @@ import {
 } from 'firebase/firestore';
 import { db, sanitizeForFirestore } from '../lib/firebase';
 import {
+  isSupabaseConfigured,
+  verifyUserWithSupabase,
+  saveProfileToSupabase,
+  fetchUsersFromSupabase,
+} from '../lib/supabase';
+import {
   User,
   Room,
   Contract,
@@ -46,7 +52,8 @@ import {
 interface RentalContextType {
   // Current active session & auth
   isAuthenticated: boolean;
-  login: (identifier: string, password?: string, role?: UserRole) => { success: boolean; message: string; user?: User };
+  isSupabaseConnected: boolean;
+  login: (identifier: string, password?: string, role?: UserRole) => Promise<{ success: boolean; message: string; user?: User; fromSupabase?: boolean }>;
   loginAsDemoUser: (userId: string) => void;
   registerUser: (userData: {
     name: string;
@@ -722,23 +729,88 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     );
   };
 
-  const login = (identifier: string, password?: string, role?: UserRole) => {
+  const login = async (
+    identifier: string,
+    password?: string,
+    role?: UserRole
+  ): Promise<{ success: boolean; message: string; user?: User; fromSupabase?: boolean }> => {
     const cleanId = identifier.trim().toLowerCase();
     const cleanPhone = identifier.trim().replace(/\s+/g, '');
     const enteredPassword = (password || '').trim();
 
-    // Check if this is the dedicated Root Admin account (Email: 60.wuy.lii.06@gmail.com, Pass: LEQUOCHUY03022006YEU*)
+    // 1. ĐỐI CHIẾU TRỰC TIẾP TRÊN CSDL SUPABASE NẾU SUPABASE ĐÃ KẾT NỐI
+    if (isSupabaseConfigured()) {
+      const supaResult = await verifyUserWithSupabase(identifier, enteredPassword, role);
+      if (supaResult) {
+        if (!supaResult.success) {
+          return {
+            success: false,
+            message: supaResult.message,
+            fromSupabase: true,
+          };
+        }
+
+        if (supaResult.user) {
+          const verifiedUser = supaResult.user;
+
+          // Cập nhật người dùng đã xác thực từ Supabase vào danh sách users
+          setUsers((prev) => {
+            const exists = prev.some((u) => u.id === verifiedUser.id || (u.email && verifiedUser.email && u.email.toLowerCase() === verifiedUser.email.toLowerCase()));
+            if (exists) {
+              return prev.map((u) =>
+                u.id === verifiedUser.id || (u.email && verifiedUser.email && u.email.toLowerCase() === verifiedUser.email.toLowerCase())
+                  ? verifiedUser
+                  : u
+              );
+            }
+            return [verifiedUser, ...prev];
+          });
+
+          setCurrentUser(verifiedUser);
+          setIsAuthenticated(true);
+
+          try {
+            confetti({
+              particleCount: 50,
+              spread: 70,
+              origin: { y: 0.65 },
+            });
+          } catch {
+            // ignore
+          }
+
+          return {
+            success: true,
+            message: supaResult.message,
+            user: verifiedUser,
+            fromSupabase: true,
+          };
+        }
+      }
+    }
+
+    // 2. CHẾ ĐỘ NỘI BỘ / FIRESTORE (KHI CHƯA CÓ SUPABASE URL/KEY HOẶC ĐANG DÙNG CSDL ĐỒNG BỘ)
+    // Đối chiếu tài khoản Quản trị viên (Root Admin)
     const isAdminIdentifier = (
       cleanId === '60.wuy.lii.06@gmail.com' ||
       cleanId === 'admin' ||
       cleanPhone === '0918889999'
     );
 
-    if (isAdminIdentifier) {
+    if (isAdminIdentifier || role === 'admin') {
+      if (role && role !== 'admin') {
+        return {
+          success: false,
+          message: 'Tài khoản này là Quản Trị Viên (Admin), không thể đăng nhập với vai trò khác!',
+          fromSupabase: false,
+        };
+      }
+
       if (enteredPassword && enteredPassword !== 'LEQUOCHUY03022006YEU*') {
         return {
           success: false,
           message: 'Mật khẩu Quản trị viên không chính xác! Vui lòng nhập đúng mật khẩu Quản trị.',
+          fromSupabase: false,
         };
       }
 
@@ -764,8 +836,9 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       return {
         success: true,
-        message: `Đăng nhập quyền Quản Trị Viên thành công! Chào mừng ${adminAccount.name}.`,
+        message: `Đăng nhập quyền Quản Trị Viên [ADMIN] thành công! Chào mừng ${adminAccount.name}.`,
         user: adminAccount,
+        fromSupabase: false,
       };
     }
     
@@ -791,16 +864,42 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
 
     if (!found) {
+      // Kiểm tra xem có trùng tài khoản nhưng sai vai trò không
+      const wrongRoleUser = users.find((u) => {
+        const uPhone = u.phone.replace(/\s+/g, '');
+        const uEmail = u.email.toLowerCase();
+        return uPhone === cleanPhone || uEmail === cleanId;
+      });
+
+      if (wrongRoleUser && role && wrongRoleUser.role !== role) {
+        return {
+          success: false,
+          message: `Sai vai trò đăng nhập! Tài khoản này có quyền [${wrongRoleUser.role.toUpperCase()}], không phải [${role.toUpperCase()}].`,
+          fromSupabase: false,
+        };
+      }
+
       return {
         success: false,
-        message: 'Tài khoản không tồn tại trên hệ thống! Vui lòng kiểm tra lại Số điện thoại / Email hoặc chọn Đăng ký mới.'
+        message: 'Tài khoản không tồn tại trên hệ thống! Vui lòng kiểm tra lại Số điện thoại / Email hoặc chọn Đăng ký mới.',
+        fromSupabase: false,
       };
     }
 
     if (found.status === 'locked') {
       return {
         success: false,
-        message: 'Tài khoản của bạn đã bị khóa bởi Quản trị viên hệ thống! Vui lòng liên hệ hỗ trợ.'
+        message: 'Tài khoản của bạn đã bị khóa bởi Quản trị viên hệ thống! Vui lòng liên hệ hỗ trợ.',
+        fromSupabase: false,
+      };
+    }
+
+    // Kiểm tra role nếu có yêu cầu
+    if (role && found.role !== role) {
+      return {
+        success: false,
+        message: `Vai trò không khớp! Tài khoản này có quyền [${found.role.toUpperCase()}].`,
+        fromSupabase: false,
       };
     }
 
@@ -820,8 +919,9 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     return {
       success: true,
-      message: `Đăng nhập thành công! Chào mừng ${found.name}.`,
-      user: found
+      message: `Đăng nhập thành công với vai trò [${found.role.toUpperCase()}]! Chào mừng ${found.name}.`,
+      user: found,
+      fromSupabase: false,
     };
   };
 
@@ -2891,6 +2991,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     <RentalContext.Provider
       value={{
         isAuthenticated,
+        isSupabaseConnected: isSupabaseConfigured(),
         login,
         loginAsDemoUser,
         registerUser,

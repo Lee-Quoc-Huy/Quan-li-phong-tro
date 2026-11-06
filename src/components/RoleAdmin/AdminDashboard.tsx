@@ -36,6 +36,7 @@ import {
   Clock,
   Layers,
   Trash2,
+  Database,
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -56,7 +57,8 @@ export const AdminDashboard: React.FC = () => {
     deleteUser,
     deleteAllNonAdminUsers,
     resolveComplaint,
-    resetAllData 
+    resetAllData,
+    isSupabaseConnected 
   } = useRental();
 
   const [activeTab, setActiveTab] = useState<'features' | 'users' | 'complaints' | 'system'>('features');
@@ -241,6 +243,17 @@ export const AdminDashboard: React.FC = () => {
             <span className="px-2.5 py-0.5 rounded-full bg-slate-900 text-teal-400 text-xs font-bold font-mono">
               ROOT ADMIN
             </span>
+            {isSupabaseConnected ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">
+                <Database className="w-3 h-3 text-emerald-600" />
+                CSDL Supabase: Đã xác thực Role
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-medium border border-slate-300">
+                <Database className="w-3 h-3 text-slate-500" />
+                CSDL: Nội bộ & Firestore
+              </span>
+            )}
           </div>
           <p className="text-sm text-slate-500 mt-0.5">
             Tài khoản: <strong className="text-slate-800">60.wuy.lii.06@gmail.com</strong> (Lê Quốc Huy) • Quản lý & Cấu hình tính năng theo nhu cầu chủ trọ

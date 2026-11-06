@@ -20,11 +20,12 @@ import {
   MapPin,
   Mail,
   User as UserIcon,
-  CreditCard
+  CreditCard,
+  Database
 } from 'lucide-react';
 
 export const AuthPage: React.FC = () => {
-  const { login, registerUser, users } = useRental();
+  const { login, registerUser, users, isSupabaseConnected } = useRental();
 
   const [activeMode, setActiveMode] = useState<'login' | 'register'>('login');
   
@@ -47,7 +48,7 @@ export const AuthPage: React.FC = () => {
   const [regHouseAddress, setRegHouseAddress] = useState('');
   const [regError, setRegError] = useState<string | null>(null);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
     setLoginSuccess(null);
@@ -58,8 +59,8 @@ export const AuthPage: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      const res = login(loginIdentifier, loginPassword);
+    try {
+      const res = await login(loginIdentifier, loginPassword);
       setIsSubmitting(false);
 
       if (!res.success) {
@@ -67,7 +68,10 @@ export const AuthPage: React.FC = () => {
       } else {
         setLoginSuccess(res.message);
       }
-    }, 350);
+    } catch (err: any) {
+      setIsSubmitting(false);
+      setLoginError(err.message || 'Lỗi kết nối cơ sở dữ liệu khi xác thực tài khoản!');
+    }
   };
 
   const handleRegisterSubmit = (e: React.FormEvent) => {
@@ -126,6 +130,25 @@ export const AuthPage: React.FC = () => {
       <div className="sm:mx-auto sm:w-full sm:max-w-lg">
         <div className="bg-white text-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden">
           
+          {/* CSDL Verification Status Bar */}
+          <div className="px-4 py-2.5 bg-slate-900 text-slate-100 flex items-center justify-between text-xs border-b border-slate-800">
+            <div className="flex items-center gap-1.5 font-bold">
+              <Database className="w-3.5 h-3.5 text-teal-400" />
+              <span>Đối chiếu CSDL:</span>
+            </div>
+            {isSupabaseConnected ? (
+              <span className="inline-flex items-center gap-1.5 text-emerald-400 font-bold bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/30 text-[11px]">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                Supabase DB (Role xác thực)
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-amber-400 font-medium bg-amber-950/70 px-2.5 py-0.5 rounded-full border border-amber-500/30 text-[11px]">
+                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                CSDL Hệ Thống & Firestore
+              </span>
+            )}
+          </div>
+
           {/* Navigation Tabs */}
           <div className="grid grid-cols-2 p-2 bg-slate-100/80 border-b border-slate-200 text-xs font-bold">
             <button
