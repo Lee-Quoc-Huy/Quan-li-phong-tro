@@ -16,6 +16,10 @@ import {
   fetchUsersFromSupabase,
   resetPasswordWithEmailAndCccd,
   changePasswordInSupabase,
+  saveClusterToSupabase,
+  saveRoomToSupabase,
+  saveInvoiceToSupabase,
+  saveContractToSupabase,
 } from '../lib/supabase';
 import {
   hashPassword,
@@ -374,12 +378,14 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
   const saveContractToFirestore = async (contract: Contract) => {
     try { await setDoc(doc(db, 'contracts', contract.id), sanitizeForFirestore(contract), { merge: true }); } catch (err) { console.error('Firestore saveContract error:', err); }
+    saveContractToSupabase(contract);
   };
   const deleteContractFromFirestore = async (contractId: string) => {
     try { await deleteDoc(doc(db, 'contracts', contractId)); } catch (err) { console.error('Firestore deleteContract error:', err); }
   };
   const saveInvoiceToFirestore = async (invoice: Invoice) => {
     try { await setDoc(doc(db, 'invoices', invoice.id), sanitizeForFirestore(invoice), { merge: true }); } catch (err) { console.error('Firestore saveInvoice error:', err); }
+    saveInvoiceToSupabase(invoice);
   };
   const deleteInvoiceFromFirestore = async (invoiceId: string) => {
     try { await deleteDoc(doc(db, 'invoices', invoiceId)); } catch (err) { console.error('Firestore deleteInvoice error:', err); }
@@ -1877,6 +1883,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
     setRooms((prev) => [...prev, newRoom]);
     saveRoomToFirestore(newRoom);
+    saveRoomToSupabase(newRoom, targetLandlordId, settings.houseName);
 
     const newTelem = {
       ...telemetry,
@@ -1900,8 +1907,11 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const updateRoom = (roomId: string, updates: Partial<Room>) => {
     const rm = rooms.find((r) => r.id === roomId);
+    const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
     if (rm) {
-      saveRoomToFirestore({ ...rm, ...updates });
+      const updated = { ...rm, ...updates };
+      saveRoomToFirestore(updated);
+      saveRoomToSupabase(updated, rm.landlordId || targetLandlordId, settings.houseName);
     }
     setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, ...updates } : r)));
   };
@@ -1933,6 +1943,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setSettings(newSettings);
     localStorage.setItem(`${STORAGE_KEY}_settings_${targetLandlordId}`, JSON.stringify(newSettings));
     saveSettingsToFirestore(newSettings);
+    saveClusterToSupabase(targetLandlordId, newSettings.houseName, newSettings.houseAddress);
 
     if (sendBroadcastNotice) {
       const priceChanges: string[] = [];

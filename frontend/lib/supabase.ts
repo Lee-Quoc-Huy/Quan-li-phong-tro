@@ -505,3 +505,101 @@ export async function fetchUsersFromSupabase(): Promise<User[] | null> {
     return null;
   }
 }
+
+/**
+ * Đồng bộ thông tin khu trọ (khu_tro) lên Supabase SQL
+ */
+export async function saveClusterToSupabase(landlordId: string, houseName: string, houseAddress: string): Promise<boolean> {
+  if (!supabase) return false;
+  try {
+    const clusterId = `khu_${landlordId}`;
+    await supabase.from('khu_tro').upsert({
+      ma_khu: clusterId,
+      ma_chu_tro: landlordId,
+      ten_khu: houseName || 'Dãy Trọ Của Tôi',
+      dia_chi: houseAddress || '',
+      mo_ta: 'Khu trọ quản lý tự động hệ thống',
+    }, { onConflict: 'ma_khu' });
+    return true;
+  } catch (err) {
+    console.error('Lỗi lưu khu trọ vào Supabase:', err);
+    return false;
+  }
+}
+
+/**
+ * Đồng bộ thông tin phòng trọ (phong) lên Supabase SQL
+ */
+export async function saveRoomToSupabase(room: any, landlordId: string, houseName?: string): Promise<boolean> {
+  if (!supabase) return false;
+  try {
+    const clusterId = `khu_${landlordId}`;
+    await saveClusterToSupabase(landlordId, houseName || 'Dãy Trọ Của Tôi', '');
+
+    await supabase.from('phong').upsert({
+      ma_phong: room.id,
+      ma_chu_tro: landlordId,
+      ma_khu: clusterId,
+      so_phong: room.roomNumber,
+      loai_phong: room.type || 'Phòng tiêu chuẩn',
+      dien_tich: room.area || 20,
+      gia_thue: room.basePrice || 0,
+      mo_ta: room.description || '',
+      trang_thai: room.status || 'available',
+      chi_so_dien_dau: room.electricityMeterStart || 0,
+      chi_so_nuoc_dau: room.waterMeterStart || 0,
+    }, { onConflict: 'ma_phong' });
+    return true;
+  } catch (err) {
+    console.error('Lỗi lưu phòng vào Supabase:', err);
+    return false;
+  }
+}
+
+/**
+ * Đồng bộ hóa đơn (hoa_don) lên Supabase SQL
+ */
+export async function saveInvoiceToSupabase(invoice: any): Promise<boolean> {
+  if (!supabase) return false;
+  try {
+    await supabase.from('hoa_don').upsert({
+      ma_hdon: invoice.id,
+      ma_hd: invoice.contractId || invoice.roomId,
+      thang_nam: invoice.monthYear,
+      chi_so_cu: invoice.electricityStart || 0,
+      chi_so_moi: invoice.electricityEnd || 0,
+      tong_tien: invoice.totalAmount || 0,
+      ngay_lap: invoice.createdAt || new Date().toISOString().split('T')[0],
+      trang_thai: invoice.status || 'pending',
+    }, { onConflict: 'ma_hdon' });
+    return true;
+  } catch (err) {
+    console.error('Lỗi lưu hóa đơn vào Supabase:', err);
+    return false;
+  }
+}
+
+/**
+ * Đồng bộ hợp đồng (hop_dong_thue) lên Supabase SQL
+ */
+export async function saveContractToSupabase(contract: any): Promise<boolean> {
+  if (!supabase) return false;
+  try {
+    await supabase.from('hop_dong_thue').upsert({
+      ma_hd: contract.id,
+      ma_phong: contract.roomId,
+      ma_nguoi_thue: contract.tenantId,
+      ngay_bat_dau: contract.startDate,
+      ngay_ket_thuc: contract.endDate,
+      tien_coc: contract.depositAmount || 0,
+      tien_thue_thang: contract.monthlyRent || 0,
+      trang_thai: contract.status || 'active',
+    }, { onConflict: 'ma_hd' });
+    return true;
+  } catch (err) {
+    console.error('Lỗi lưu hợp đồng vào Supabase:', err);
+    return false;
+  }
+}
+
+
