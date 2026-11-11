@@ -19,7 +19,8 @@
         "hostCode": { "type": "string" },
         "landlordId": { "type": "string" },
         "roomId": { "type": "string" },
-        "licenseTier": { "type": "string", "enum": ["standard", "pro", "enterprise"] }
+        "licenseTier": { "type": "string", "enum": ["standard", "pro", "enterprise"] },
+        "passwordHash": { "type": "string" }
       },
       "required": ["id", "name", "email", "phone", "role", "status", "joinedAt"]
     },
@@ -38,8 +39,6 @@
         "status": { "type": "string", "enum": ["available", "occupied", "maintenance"] },
         "currentTenantId": { "type": "string" },
         "currentTenantName": { "type": "string" },
-        "doorLockState": { "type": "string", "enum": ["locked", "unlocked"] },
-        "doorPasscode": { "type": "string" },
         "securityStatus": { "type": "string", "enum": ["secure", "warning", "tampered"] },
         "electricityMeterStart": { "type": "number" },
         "waterMeterStart": { "type": "number" },
