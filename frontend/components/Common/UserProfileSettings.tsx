@@ -184,8 +184,28 @@ export const UserProfileSettings: React.FC = () => {
     setTimeout(() => setSuccessMsg(null), 3000);
   };
 
+  const [profileError, setProfileError] = useState<string | null>(null);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setProfileError(null);
+    setSuccessMsg(null);
+
+    if (!name.trim() || !phone.trim() || !email.trim() || !idCard.trim()) {
+      setProfileError('Vui lòng điền đầy đủ Họ tên, Số điện thoại, Email và Số CCCD!');
+      return;
+    }
+
+    if (!/^\d{10}$/.test(phone.trim())) {
+      setProfileError('Số điện thoại bắt buộc phải có đúng 10 chữ số!');
+      return;
+    }
+
+    if (!/^\d{10,13}$/.test(idCard.trim())) {
+      setProfileError('Số CCCD bắt buộc phải từ 10 đến 13 chữ số!');
+      return;
+    }
+
     updateUserProfile({
       name: name.trim(),
       email: email.trim(),
@@ -235,6 +255,13 @@ export const UserProfileSettings: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {profileError && (
+        <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-500/50 text-rose-300 text-sm flex items-center gap-3 shadow-lg">
+          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+          <span className="font-semibold">{profileError}</span>
+        </div>
+      )}
 
       {successMsg && (
         <div className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-300 text-sm flex items-center gap-3 shadow-lg">

@@ -2079,9 +2079,26 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
     const monthYear = `${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`;
     const occupiedRooms = rooms.filter((r) => r.status === 'occupied');
+
+    if (occupiedRooms.length === 0) {
+      alert('Không có phòng nào đang có khách thuê (occupied) để lập hóa đơn!');
+      return { count: 0, totalSum: 0 };
+    }
+
+    // Filter rooms that have real telemetry or meter readings
+    const validRooms = occupiedRooms.filter((rm) => {
+      const tel = telemetry[rm.id];
+      return tel && (tel.currentKwh > rm.electricityMeterStart || tel.currentWaterM3 > rm.waterMeterStart);
+    });
+
+    if (validRooms.length === 0) {
+      alert('Chưa có dữ liệu chỉ số điện nước thực tế cho các phòng đang thuê! Vui lòng cập nhật số điện/nước thật trên đồng hồ trước khi AI có thể lập hóa đơn.');
+      return { count: 0, totalSum: 0 };
+    }
+
     let totalSum = 0;
 
-    const newInvoices: Invoice[] = occupiedRooms.map((rm) => {
+    const newInvoices: Invoice[] = validRooms.map((rm) => {
       const tenant = users.find((u) => u.id === rm.currentTenantId);
       const contract = contracts.find((c) => c.roomId === rm.id && c.status === 'active');
       const tel = telemetry[rm.id];
@@ -2089,8 +2106,14 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const isPrepaid = (contract?.prepaidMonthsRemaining || 0) > 0;
       const rent = isPrepaid ? 0 : rm.basePrice;
 
-      const elecUsed = Math.floor(110 + Math.random() * 45);
-      const waterUsed = Math.floor(6 + Math.random() * 5);
+      const elecStart = rm.electricityMeterStart;
+      const elecEnd = tel?.currentKwh || elecStart;
+      const elecUsed = Math.max(0, elecEnd - elecStart);
+
+      const waterStart = rm.waterMeterStart;
+      const waterEnd = tel?.currentWaterM3 || waterStart;
+      const waterUsed = Math.max(0, waterEnd - waterStart);
+
       const elecTotal = elecUsed * settings.electricityRate;
       const waterTotal = waterUsed * settings.waterRate;
       const total = rent + elecTotal + waterTotal + settings.garbageFee + settings.internetFee + settings.serviceFee;
@@ -2110,13 +2133,13 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         rentAmount: rent,
         isRentPrepaid: isPrepaid,
-        electricityStart: Math.round((tel?.currentKwh || 2000) - elecUsed),
-        electricityEnd: Math.round(tel?.currentKwh || 2000),
+        electricityStart: elecStart,
+        electricityEnd: elecEnd,
         electricityUsed: elecUsed,
         electricityRate: settings.electricityRate,
         electricityTotal: elecTotal,
-        waterStart: Math.round((tel?.currentWaterM3 || 100) - waterUsed),
-        waterEnd: Math.round(tel?.currentWaterM3 || 100),
+        waterStart: waterStart,
+        waterEnd: waterEnd,
         waterUsed: waterUsed,
         waterRate: settings.waterRate,
         waterTotal: waterTotal,
@@ -2134,7 +2157,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           transferContent: `HG ${rm.roomNumber.replace(/\s+/g, '')} T${monthYear.replace('/', '')}`,
         },
         aiGenerated: true,
-        aiNote: `AI đã tổng hợp từ đồng hồ đo IoT: Điện ${elecUsed} kWh, Nước ${waterUsed} m³. ${isPrepaid ? 'Khách đã trả trước tiền phòng.' : ''}`,
+        aiNote: `AI tính toán tự động dựa trên số liệu thực tế: Điện tiêu thụ ${elecUsed} kWh, Nước tiêu thụ ${waterUsed} m³. ${isPrepaid ? 'Khách đã trả trước tiền phòng.' : ''}`,
       };
     });
 
@@ -2143,12 +2166,12 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     // Send broadcast to landlord and tenants
     broadcastNotice(
-      `Hệ thống AI vừa lập ${occupiedRooms.length} hóa đơn kỳ ${monthYear}`,
+      `Hệ thống AI vừa lập ${validRooms.length} hóa đơn kỳ ${monthYear} theo số liệu thật`,
       `Tổng giá trị hóa đơn xuất là ${totalSum.toLocaleString('vi-VN')} đ. Đã gửi thông báo thanh toán và mã VietQR tới từng phòng.`,
       'normal'
     );
 
-    return { count: occupiedRooms.length, totalSum };
+    return { count: validRooms.length, totalSum };
   };
 
   // 8. Pay Invoice (Single month or Multi-month Prepayment)

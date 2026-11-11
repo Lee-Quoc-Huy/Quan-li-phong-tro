@@ -93,8 +93,18 @@ export const AuthPage: React.FC = () => {
     e.preventDefault();
     setRegError(null);
 
-    if (!regName.trim() || !regPhone.trim()) {
-      setRegError('Vui lòng điền Họ tên và Số điện thoại!');
+    if (!regName.trim() || !regPhone.trim() || !regEmail.trim() || !regIdCard.trim()) {
+      setRegError('Vui lòng điền đầy đủ Họ tên, Số điện thoại, Email và Số CCCD!');
+      return;
+    }
+
+    if (!/^\d{10}$/.test(regPhone.trim())) {
+      setRegError('Số điện thoại bắt buộc phải có đúng 10 chữ số!');
+      return;
+    }
+
+    if (!/^\d{10,13}$/.test(regIdCard.trim())) {
+      setRegError('Số CCCD bắt buộc phải từ 10 đến 13 chữ số!');
       return;
     }
 
@@ -468,12 +478,13 @@ export const AuthPage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="block text-xs font-bold text-slate-700">
-                      Email đăng ký:
+                      Email đăng ký: *
                     </label>
                     <div className="relative">
                       <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
                       <input
                         type="email"
+                        required
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
                         placeholder="email@domain.com"
@@ -484,15 +495,16 @@ export const AuthPage: React.FC = () => {
 
                   <div className="space-y-1">
                     <label className="block text-xs font-bold text-slate-700">
-                      Số CCCD / CMND:
+                      Số CCCD / CMND: * (10-13 số)
                     </label>
                     <div className="relative">
                       <CreditCard className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
                       <input
                         type="text"
+                        required
                         value={regIdCard}
                         onChange={(e) => setRegIdCard(e.target.value)}
-                        placeholder="079201001234 (để khôi phục MK)"
+                        placeholder="079201001234"
                         className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono"
                       />
                     </div>
