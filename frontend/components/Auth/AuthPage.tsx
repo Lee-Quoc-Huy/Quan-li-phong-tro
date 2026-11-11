@@ -206,24 +206,7 @@ export const AuthPage: React.FC = () => {
       <div className="sm:mx-auto sm:w-full sm:max-w-lg">
         <div className="bg-white text-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden">
           
-          {/* CSDL Verification Status Bar */}
-          <div className="px-4 py-2.5 bg-slate-900 text-slate-100 flex items-center justify-between text-xs border-b border-slate-800">
-            <div className="flex items-center gap-1.5 font-bold">
-              <Database className="w-3.5 h-3.5 text-teal-400" />
-              <span>Đối chiếu CSDL:</span>
-            </div>
-            {isSupabaseConnected ? (
-              <span className="inline-flex items-center gap-1.5 text-emerald-400 font-bold bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/30 text-[11px]">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                Supabase SQL (16 bảng ERD)
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-amber-400 font-medium bg-amber-950/70 px-2.5 py-0.5 rounded-full border border-amber-500/30 text-[11px]">
-                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                CSDL Hệ Thống & Firestore
-              </span>
-            )}
-          </div>
+
 
           {/* Navigation Tabs */}
           <div className="grid grid-cols-3 p-1.5 bg-slate-100/90 border-b border-slate-200 text-xs font-bold gap-1">
@@ -719,20 +702,11 @@ export const AuthPage: React.FC = () => {
           </div>
 
           {/* Footer Highlights */}
-          <div className="p-4 bg-slate-50 border-t border-slate-200/80 text-[11px] text-slate-500 flex items-center justify-between">
+          <div className="p-4 bg-slate-50 border-t border-slate-200/80 text-[11px] text-slate-500 flex items-center justify-center">
             <div className="flex items-center gap-1.5 text-slate-700 font-medium">
               <ShieldCheck className="w-4 h-4 text-teal-600" />
-              Mật khẩu băm SHA-256 an toàn
+              Hệ thống bảo mật mật khẩu băm SHA-256 an toàn
             </div>
-            
-            <button
-              type="button"
-              onClick={() => setShowSqlModal(true)}
-              className="text-teal-700 hover:text-teal-900 font-semibold inline-flex items-center gap-1"
-            >
-              <Code2 className="w-3.5 h-3.5" />
-              <span>Xem mã SQL Supabase</span>
-            </button>
           </div>
 
         </div>
