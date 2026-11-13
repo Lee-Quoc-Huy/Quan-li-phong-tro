@@ -5,9 +5,9 @@
 
 const PASSWORD_SALT = 'smart_rental_salt_2026';
 
-// Băm SHA-256 của mật khẩu Quản Trị Viên (Admin) tối cao
+// Băm SHA-256 của mật khẩu Quản Trị Viên (Admin) tối cao (mật khẩu: admin)
 // Tuyệt đối không lưu mật khẩu thô trong mã nguồn hoặc gói client bundle
-export const ADMIN_PASSWORD_HASH = '271ce2ddbf399b3952460a8e28d05465b48ed033e11bddd4920da03c9d3370f0';
+export const ADMIN_PASSWORD_HASH = '89c00d2ecfa625790c1d12a57f3f08282d90b9847b8969a0ae3c46a903b722dc';
 
 /**
  * Băm mật khẩu bằng thuật toán SHA-256 chuẩn Web Crypto API

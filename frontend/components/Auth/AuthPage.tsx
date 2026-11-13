@@ -219,7 +219,7 @@ export const AuthPage: React.FC = () => {
 
 
           {/* Navigation Tabs */}
-          <div className="grid grid-cols-3 p-1.5 bg-slate-100/90 border-b border-slate-200 text-xs font-bold gap-1">
+          <div className="grid grid-cols-2 p-1.5 bg-slate-100/90 border-b border-slate-200 text-xs font-bold gap-1">
             <button
               type="button"
               onClick={() => {
@@ -250,23 +250,6 @@ export const AuthPage: React.FC = () => {
             >
               <UserPlus className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span className="truncate">Đăng Ký</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveMode('forgot-password');
-                setForgotError(null);
-                setForgotSuccess(null);
-              }}
-              className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 text-center ${
-                activeMode === 'forgot-password'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <KeyRound className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span className="truncate">Đổi MK (CCCD)</span>
             </button>
           </div>
 
@@ -336,7 +319,7 @@ export const AuthPage: React.FC = () => {
                       }}
                       className="text-xs text-teal-600 hover:text-teal-700 font-semibold hover:underline"
                     >
-                      Quên mật khẩu? (Email & CCCD)
+                      Quên mật khẩu?
                     </button>
                   </div>
                   <div className="relative">
@@ -369,7 +352,7 @@ export const AuthPage: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="pt-2 text-center flex items-center justify-between text-xs text-slate-500">
+                <div className="pt-2 text-center text-xs text-slate-500">
                   <span>
                     Chưa có tài khoản?{' '}
                     <button
@@ -380,14 +363,6 @@ export const AuthPage: React.FC = () => {
                       Đăng ký ngay
                     </button>
                   </span>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveMode('forgot-password')}
-                    className="text-amber-600 font-semibold hover:underline"
-                  >
-                    Đổi mật khẩu qua CCCD
-                  </button>
                 </div>
               </form>
             )}
@@ -621,7 +596,7 @@ export const AuthPage: React.FC = () => {
                       required
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
-                      placeholder="vd: 60.wuy.lii.06@gmail.com hoặc user@email.com"
+                      placeholder="vd: admin@gmail.com hoặc user@email.com"
                       className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                     />
                   </div>
@@ -770,7 +745,7 @@ export const AuthPage: React.FC = () => {
 + Bảng tương thích: profiles (id, name, email, phone, role, avatar, id_card, password_hash)
 
 * File schema đầy đủ: /sql/supabase_schema.sql
-* Tài khoản Quản trị khởi tạo: 60.wuy.lii.06@gmail.com / CCCD: 001200000001`}
+* Tài khoản Quản trị khởi tạo: admin@gmail.com / CCCD: 001200000001`}
               </pre>
             </div>
 

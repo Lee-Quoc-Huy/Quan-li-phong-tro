@@ -18,11 +18,11 @@ import { ADMIN_PASSWORD_HASH } from './lib/security';
 export const ADMIN_USER: User = {
   id: 'admin_root',
   name: 'Lê Quốc Huy (Admin)',
-  email: '60.wuy.lii.06@gmail.com',
+  email: 'admin@gmail.com',
   phone: '0918889999',
   role: 'admin',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-  idCard: '079206008899',
+  idCard: '001200000001',
   status: 'active',
   joinedAt: '2026-01-01',
   licenseTier: 'enterprise',

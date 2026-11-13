@@ -325,36 +325,40 @@ END $$;
 
 -- ==============================================================================
 -- KHỞI TẠO TÀI KHOẢN QUẢN TRỊ VIÊN GỐC (ROOT ADMIN)
--- Mật khẩu ban đầu mặc định: Admin@2026! (Băm SHA-256 kèm muối)
+-- Tài khoản: admin@gmail.com | Mật khẩu mặc định: admin (Băm SHA-256 kèm muối)
 -- ==============================================================================
+DELETE FROM quan_tri_vien WHERE email = 'admin@gmail.com' AND ma_qtv <> 'admin_root';
 INSERT INTO quan_tri_vien (
     ma_qtv, ho_ten, sdt, email, cccd, vai_tro, password_hash, trang_thai
 ) VALUES (
     'admin_root',
     'Quản Trị Viên Tối Cao',
     '0918889999',
-    '60.wuy.lii.06@gmail.com',
+    'admin@gmail.com',
     '001200000001',
     'admin',
-    '271ce2ddbf399b3952460a8e28d05465b48ed033e11bddd4920da03c9d3370f0',
+    '89c00d2ecfa625790c1d12a57f3f08282d90b9847b8969a0ae3c46a903b722dc',
     'active'
-) ON CONFLICT (email) DO UPDATE SET
+) ON CONFLICT (ma_qtv) DO UPDATE SET
+    email = EXCLUDED.email,
     password_hash = EXCLUDED.password_hash,
     cccd = EXCLUDED.cccd;
 
+DELETE FROM profiles WHERE email = 'admin@gmail.com' AND id <> 'admin_root';
 INSERT INTO profiles (
     id, name, email, phone, role, id_card, password_hash, status, license_tier
 ) VALUES (
     'admin_root',
     'Quản Trị Viên Tối Cao',
-    '60.wuy.lii.06@gmail.com',
+    'admin@gmail.com',
     '0918889999',
     'admin',
     '001200000001',
-    '271ce2ddbf399b3952460a8e28d05465b48ed033e11bddd4920da03c9d3370f0',
+    '89c00d2ecfa625790c1d12a57f3f08282d90b9847b8969a0ae3c46a903b722dc',
     'active',
     'enterprise'
-) ON CONFLICT (email) DO UPDATE SET
+) ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
     password_hash = EXCLUDED.password_hash,
     id_card = EXCLUDED.id_card;
 

@@ -808,7 +808,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // 2. CHẾ ĐỘ NỘI BỘ / FIRESTORE (KHI CHƯA CÓ SUPABASE URL/KEY HOẶC ĐANG DÙNG CSDL ĐỒNG BỘ)
     // Đối chiếu tài khoản Quản trị viên (Root Admin)
     const isAdminIdentifier = (
-      cleanId === '60.wuy.lii.06@gmail.com' ||
+      cleanId === 'admin@gmail.com' ||
       cleanId === 'admin' ||
       cleanPhone === '0918889999'
     );
@@ -833,10 +833,12 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
 
       // Find or create root admin user
-      let adminAccount = users.find((u) => u.role === 'admin' || u.email.toLowerCase() === '60.wuy.lii.06@gmail.com');
+      let adminAccount = users.find((u) => u.role === 'admin' || u.email.toLowerCase() === 'admin@gmail.com');
       if (!adminAccount) {
         adminAccount = ADMIN_USER;
         setUsers((prev) => [ADMIN_USER, ...prev.filter(u => u.id !== 'admin_root')]);
+      } else if (adminAccount.id === 'admin_root') {
+        adminAccount = { ...adminAccount, email: ADMIN_USER.email, passwordHash: ADMIN_PASSWORD_HASH };
       }
 
       setCurrentUser(adminAccount);

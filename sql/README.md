@@ -3,7 +3,7 @@
 Thư mục này chứa toàn bộ mã nguồn cơ sở dữ liệu SQL theo đúng sơ đồ thực thể liên kết (ERD 16 bảng).
 
 ## 1. Tệp tin chính
-- `supabase_schema.sql`: Toàn bộ câu lệnh DDL khởi tạo 16 bảng quan hệ, thiết lập RLS (Row Level Security), phân quyền truy cập, các chỉ mục (indexes), và tài khoản Quản trị viên khởi tạo (`60.wuy.lii.06@gmail.com`).
+- `supabase_schema.sql`: Toàn bộ câu lệnh DDL khởi tạo 16 bảng quan hệ, thiết lập RLS (Row Level Security), phân quyền truy cập, các chỉ mục (indexes), và tài khoản Quản trị viên khởi tạo (`admin@gmail.com`).
 
 ## 2. 16 Bảng theo sơ đồ ERD:
 1. `quan_tri_vien`: Quản trị viên tối cao hệ thống.

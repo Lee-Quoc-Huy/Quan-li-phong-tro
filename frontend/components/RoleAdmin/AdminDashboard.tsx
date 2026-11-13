@@ -236,7 +236,7 @@ export const AdminDashboard: React.FC = () => {
             )}
           </div>
           <p className="text-sm text-slate-500 mt-0.5">
-            Tài khoản: <strong className="text-slate-800">60.wuy.lii.06@gmail.com</strong> (Lê Quốc Huy) • Quản lý & Cấu hình tính năng theo nhu cầu chủ trọ
+            Tài khoản: <strong className="text-slate-800">admin@gmail.com</strong> (Lê Quốc Huy) • Quản lý & Cấu hình tính năng theo nhu cầu chủ trọ
           </p>
         </div>
 
@@ -618,11 +618,11 @@ export const AdminDashboard: React.FC = () => {
                   <div className="font-bold text-sm text-white flex items-center gap-2">
                     Lê Quốc Huy (Admin)
                     <span className="px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-[10px] font-mono font-bold border border-teal-500/40">
-                      60.wuy.lii.06@gmail.com
+                      admin@gmail.com
                     </span>
                   </div>
                   <div className="text-xs text-slate-400 mt-0.5">
-                    SĐT: 0918889999 • CCCD: 079206008899 • Quyền hạn: Toàn quyền quản trị hệ thống
+                    SĐT: 0918889999 • CCCD: 001200000001 • Quyền hạn: Toàn quyền quản trị hệ thống
                   </div>
                 </div>
               </div>
@@ -978,7 +978,7 @@ export const AdminDashboard: React.FC = () => {
               Công Cụ Đặt Lại & Bảo Trì Hệ Thống
             </h2>
             <p className="text-slate-500 leading-relaxed">
-              Xóa sạch toàn bộ dữ liệu tạm trên trình duyệt và đưa hệ thống về trạng thái sạch sẽ ban đầu. Tài khoản Admin gốc (<code className="text-teal-700 font-bold font-mono">60.wuy.lii.06@gmail.com</code>) sẽ luôn được bảo tồn.
+              Xóa sạch toàn bộ dữ liệu tạm trên trình duyệt và đưa hệ thống về trạng thái sạch sẽ ban đầu. Tài khoản Admin gốc (<code className="text-teal-700 font-bold font-mono">admin@gmail.com</code>) sẽ luôn được bảo tồn.
             </p>
           </div>
 
