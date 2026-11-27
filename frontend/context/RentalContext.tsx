@@ -18,6 +18,7 @@ import {
   changePasswordInSupabase,
   saveClusterToSupabase,
   saveRoomToSupabase,
+  fetchRoomPhotosFromSupabase,
   saveInvoiceToSupabase,
   saveContractToSupabase,
 } from '../lib/supabase';
@@ -29,6 +30,7 @@ import {
 import {
   User,
   Room,
+  PublicRoomListing,
   Contract,
   Invoice,
   IssueTicket,
@@ -60,6 +62,8 @@ import {
   generateRandomHostCode,
 } from '../mockData';
 
+const roomPhotoKey = (landlordId: string, roomId: string) => JSON.stringify([landlordId, roomId]);
+
 interface RentalContextType {
   // Current active session & auth
   isAuthenticated: boolean;
@@ -88,6 +92,8 @@ interface RentalContextType {
   currentHouseName: string;
   settings: LandlordSettings;
   rooms: Room[];
+  publicRoomListings: PublicRoomListing[];
+  isLoadingPublicRooms: boolean;
   contracts: Contract[];
   invoices: Invoice[];
   issues: IssueTicket[];
@@ -129,8 +135,8 @@ interface RentalContextType {
   updateGoogleSheetSettings: (webhookUrl: string, enabled: boolean) => void;
   
   // Actions - Room Management
-  addRoom: (roomData: Omit<Room, 'id' | 'landlordId' | 'doorLockState' | 'securityStatus'>) => void;
-  updateRoom: (roomId: string, updates: Partial<Room>) => void;
+  addRoom: (roomData: Omit<Room, 'id' | 'landlordId' | 'doorLockState' | 'securityStatus'>, roomId?: string) => Promise<boolean>;
+  updateRoom: (roomId: string, updates: Partial<Room>) => Promise<boolean>;
   deleteRoom: (roomId: string) => void;
   
   // Actions - Pricing & Broadcast
@@ -265,6 +271,25 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
     return INITIAL_ROOMS;
   });
+
+  const [roomPhotos, setRoomPhotos] = useState<Record<string, string[]>>({});
+  const [isLoadingPublicRooms, setIsLoadingPublicRooms] = useState(isSupabaseConfigured);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let cancelled = false;
+    fetchRoomPhotosFromSupabase()
+      .then((photos) => {
+        if (cancelled) return;
+        const downloaded = Object.fromEntries(photos.map(({ landlordId, roomId, urls }) => [
+          roomPhotoKey(landlordId, roomId), urls,
+        ]));
+        setRoomPhotos((previous) => ({ ...downloaded, ...previous }));
+      })
+      .catch((error) => console.error('Lỗi tải URL ảnh phòng:', error))
+      .finally(() => { if (!cancelled) setIsLoadingPublicRooms(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const [contracts, setContracts] = useState<Contract[]>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_contracts`);
@@ -1874,18 +1899,25 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // 4. Room operations
-  const addRoom = (roomData: Omit<Room, 'id' | 'landlordId' | 'doorLockState' | 'securityStatus'>) => {
+  const addRoom = async (
+    roomData: Omit<Room, 'id' | 'landlordId' | 'doorLockState' | 'securityStatus'>,
+    newRoomId = `room_${Date.now()}`,
+  ) => {
     const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
-    const newRoomId = `room_${Date.now()}`;
+    const { imageUrls, ...details } = roomData;
     const newRoom: Room = {
-      ...roomData,
+      ...details,
       id: newRoomId,
       landlordId: targetLandlordId,
       securityStatus: 'secure',
     };
+    const save = saveRoomToSupabase({ ...newRoom, imageUrls }, targetLandlordId, settings.houseName);
+    if (imageUrls !== undefined) {
+      if (!(await save)) return false;
+      setRoomPhotos((previous) => ({ ...previous, [roomPhotoKey(targetLandlordId, newRoomId)]: imageUrls }));
+    }
     setRooms((prev) => [...prev, newRoom]);
     saveRoomToFirestore(newRoom);
-    saveRoomToSupabase(newRoom, targetLandlordId, settings.houseName);
 
     const newTelem = {
       ...telemetry,
@@ -1905,17 +1937,24 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
     setTelemetry(newTelem);
     saveTelemetryToFirestore(newTelem);
+    return true;
   };
 
-  const updateRoom = (roomId: string, updates: Partial<Room>) => {
+  const updateRoom = async (roomId: string, updates: Partial<Room>) => {
     const rm = rooms.find((r) => r.id === roomId);
+    if (!rm || (currentUser.role === 'landlord' && rm.landlordId !== currentUser.id)) return false;
     const targetLandlordId = currentUser.role === 'landlord' ? currentUser.id : (settings.landlordId || 'main');
-    if (rm) {
-      const updated = { ...rm, ...updates };
-      saveRoomToFirestore(updated);
-      saveRoomToSupabase(updated, rm.landlordId || targetLandlordId, settings.houseName);
+    const ownerId = rm.landlordId || targetLandlordId;
+    const { imageUrls, ...details } = updates;
+    const updated = { ...rm, ...details };
+    const save = saveRoomToSupabase({ ...updated, imageUrls }, ownerId, settings.houseName);
+    if (imageUrls !== undefined) {
+      if (!(await save)) return false;
+      setRoomPhotos((previous) => ({ ...previous, [roomPhotoKey(ownerId, roomId)]: imageUrls }));
     }
-    setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, ...updates } : r)));
+    saveRoomToFirestore(updated);
+    setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, ...details } : r)));
+    return true;
   };
 
   const deleteRoom = (roomId: string) => {
@@ -3062,15 +3101,37 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return users;
   }, [users, currentUser]);
 
+  const publicRoomListings = React.useMemo<PublicRoomListing[]>(() => {
+    if (isAuthenticated) return [];
+    const landlords = new Map<string, User>(users
+      .filter((user) => user.role === 'landlord' && user.status === 'active')
+      .map((user) => [user.id, user] as const));
+    return rooms.flatMap((room) => {
+      const landlord = landlords.get(room.landlordId);
+      if (room.status !== 'available' || !landlord) return [];
+      return [{
+        id: room.id,
+        roomNumber: room.roomNumber,
+        areaM2: room.areaM2,
+        basePrice: room.basePrice,
+        houseName: landlord.houseName?.trim(),
+        imageUrls: roomPhotos[roomPhotoKey(room.landlordId, room.id)],
+      }];
+    });
+  }, [isAuthenticated, rooms, users, roomPhotos]);
+
   const filteredRooms = React.useMemo(() => {
     if (currentUser.role === 'landlord') {
-      return rooms.filter((r) => r.landlordId === currentUser.id);
+      return rooms.filter((r) => r.landlordId === currentUser.id).map((room) => ({
+        ...room,
+        imageUrls: roomPhotos[roomPhotoKey(room.landlordId, room.id)],
+      }));
     }
     if (currentUser.role === 'tenant') {
       return rooms.filter((r) => r.landlordId === currentUser.landlordId);
     }
     return rooms;
-  }, [rooms, currentUser]);
+  }, [rooms, currentUser, roomPhotos]);
 
   const filteredContracts = React.useMemo(() => {
     if (currentUser.role === 'landlord') {
@@ -3182,6 +3243,8 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         currentHouseName,
         settings,
         rooms: filteredRooms,
+        publicRoomListings,
+        isLoadingPublicRooms,
         contracts: filteredContracts,
         invoices: filteredInvoices,
         issues: filteredIssues,

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useRental } from '../../context/RentalContext';
 import { AppLogo } from '../Common/AppLogo';
+import { PublicRoomFeed } from './PublicRoomFeed';
+import './AuthPage.css';
 import { UserRole } from '../../types';
 import { 
   Building2, 
@@ -26,9 +28,13 @@ import {
 } from 'lucide-react';
 
 export const AuthPage: React.FC = () => {
-  const { login, registerUser, users, isSupabaseConnected, resetPasswordByEmailAndCccd } = useRental();
+  const {
+    login, registerUser, users, isSupabaseConnected, resetPasswordByEmailAndCccd,
+    publicRoomListings, isLoadingPublicRooms,
+  } = useRental();
 
   const [activeMode, setActiveMode] = useState<'login' | 'register' | 'forgot-password'>('login');
+  const [showAuth, setShowAuth] = useState(false);
   
   // Login form state
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -194,7 +200,41 @@ export const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 selection:bg-teal-500 selection:text-white">
+    <div className="min-h-dvh bg-slate-900 text-slate-100 selection:bg-teal-500 selection:text-white">
+
+      <nav aria-label="Chuyển màn hình" className={`sticky top-0 z-20 border-b px-4 py-3 backdrop-blur-sm sm:px-6 ${showAuth ? 'border-slate-800 bg-slate-900/95' : 'border-emerald-950/10 bg-[#f7f8f4]/95'}`}>
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+          {!showAuth && (
+            <div className="flex min-w-0 items-center gap-2.5 text-sm font-bold text-emerald-950">
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-900 text-white">
+                <Building2 size={18} aria-hidden="true" />
+              </span>
+              Quản lý trọ
+            </div>
+          )}
+          <button
+            type="button"
+            aria-controls={showAuth ? 'public-feed-panel' : 'account-panel'}
+            aria-label={showAuth ? 'Xem phòng trống' : 'Mở đăng nhập'}
+            title={showAuth ? 'Xem phòng trống' : 'Mở đăng nhập'}
+            onClick={() => {
+              setShowAuth((previous) => !previous);
+              window.scrollTo({ top: 0, behavior: 'instant' });
+            }}
+            className={`inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl px-3.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${showAuth ? 'border border-slate-600 bg-slate-800 text-white hover:bg-slate-700' : 'border border-emerald-900/20 bg-white text-emerald-950 hover:bg-emerald-50'}`}
+          >
+            {showAuth ? <Building2 size={20} aria-hidden="true" /> : <LogIn size={20} aria-hidden="true" />}
+            <span className="hidden sm:inline">{showAuth ? 'Xem phòng trống' : 'Đăng nhập'}</span>
+          </button>
+        </div>
+      </nav>
+
+      <main className="relative isolate overflow-clip">
+        <div id="public-feed-panel" className="public-view public-view--feed min-h-[calc(100dvh-4.25rem)] bg-[#f7f8f4] px-4 pb-12 pt-6 text-slate-900 sm:px-6 sm:pt-9" data-inactive={showAuth} inert={showAuth}>
+          <PublicRoomFeed listings={publicRoomListings} isLoading={isLoadingPublicRooms} />
+        </div>
+
+      <div id="account-panel" className="public-view public-view--account px-4 pb-12 pt-6 sm:px-6" data-inactive={!showAuth} inert={!showAuth}>
       
       {/* Brand Header */}
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3 mb-6">
@@ -213,7 +253,7 @@ export const AuthPage: React.FC = () => {
       </div>
 
       {/* Main Form Container */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-lg">
+      <div className="mx-auto w-full min-w-0 max-w-lg">
         <div className="bg-white text-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden">
           
 
@@ -698,6 +738,9 @@ export const AuthPage: React.FC = () => {
 
         </div>
       </div>
+
+      </div>
+      </main>
 
       {/* MODAL XEM MÃ SQL CHO SUPABASE (CHUẨN 16 BẢNG ERD) */}
       {showSqlModal && (

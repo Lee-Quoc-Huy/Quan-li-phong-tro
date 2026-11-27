@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { User, UserRole } from '../types';
 import { verifyPassword, hashPassword } from './security';
+import { getRoomPhotoUrls } from './roomPhotos';
 
 const env = ((import.meta as any).env || {}) as Record<string, string | undefined>;
 const supabaseUrl = (env.VITE_SUPABASE_URL || '').trim();
@@ -536,23 +537,53 @@ export async function saveRoomToSupabase(room: any, landlordId: string, houseNam
     const clusterId = `khu_${landlordId}`;
     await saveClusterToSupabase(landlordId, houseName || 'Dãy Trọ Của Tôi', '');
 
-    await supabase.from('phong').upsert({
+    let photoDetails: { chi_tiet?: Record<string, unknown> } = {};
+    if (room.imageUrls !== undefined) {
+      const { data, error } = await supabase.from('phong').select('chi_tiet')
+        .eq('ma_phong', room.id).eq('ma_chu_tro', landlordId).maybeSingle();
+      if (error) throw error;
+      photoDetails = { chi_tiet: { ...data?.chi_tiet, imageUrls: getRoomPhotoUrls(room.imageUrls) } };
+    }
+
+    const { error } = await supabase.from('phong').upsert({
       ma_phong: room.id,
       ma_chu_tro: landlordId,
       ma_khu: clusterId,
       so_phong: room.roomNumber,
       loai_phong: room.type || 'Phòng tiêu chuẩn',
-      dien_tich: room.area || 20,
+      dien_tich: room.areaM2 || room.area || 20,
       gia_thue: room.basePrice || 0,
       mo_ta: room.description || '',
       trang_thai: room.status || 'available',
       chi_so_dien_dau: room.electricityMeterStart || 0,
       chi_so_nuoc_dau: room.waterMeterStart || 0,
+      ...photoDetails,
     }, { onConflict: 'ma_phong' });
+    if (error) throw error;
     return true;
   } catch (err) {
     console.error('Lỗi lưu phòng vào Supabase:', err);
     return false;
+  }
+}
+
+export async function fetchRoomPhotosFromSupabase() {
+  if (!supabase) return [];
+  const pageSize = 500;
+  const photos: { roomId: string; landlordId: string; urls: string[] }[] = [];
+  for (let start = 0; ; start += pageSize) {
+    const { data, error } = await supabase.from('phong')
+      .select('ma_phong, ma_chu_tro, image_urls:chi_tiet->imageUrls')
+      .not('chi_tiet->imageUrls', 'is', null)
+      .order('ma_phong')
+      .range(start, start + pageSize - 1);
+    if (error) throw error;
+    photos.push(...data.map((row) => ({
+      roomId: row.ma_phong,
+      landlordId: row.ma_chu_tro,
+      urls: getRoomPhotoUrls(row.image_urls),
+    })));
+    if (data.length < pageSize) return photos;
   }
 }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRental } from '../../context/RentalContext';
 import { 
   DoorClosed, 
@@ -11,9 +11,21 @@ import {
   Building
 } from 'lucide-react';
 import { Room } from '../../types';
+import { getRoomPhotoUrls, maxRoomPhotoBytes, maxRoomPhotos, roomPhotoTypes, roomPhotoUploadConfigured, uploadRoomPhoto } from '../../lib/roomPhotos';
+
+function LocalPhotoPreview({ file, position }: { file: File; position: number }) {
+  const [url, setUrl] = useState('');
+  useEffect(() => {
+    const preview = URL.createObjectURL(file);
+    setUrl(preview);
+    return () => URL.revokeObjectURL(preview);
+  }, [file]);
+
+  return url ? <img src={url} alt={`Ảnh ${position}`} className="size-full object-cover" /> : null;
+}
 
 export const LandlordRooms: React.FC = () => {
-  const { rooms, addRoom, updateRoom, deleteRoom, users } = useRental();
+  const { rooms, addRoom, updateRoom, deleteRoom, users, isSupabaseConnected } = useRental();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
@@ -24,9 +36,18 @@ export const LandlordRooms: React.FC = () => {
   const [areaM2, setAreaM2] = useState(25);
   const [basePrice, setBasePrice] = useState(3500000);
   const [amenities, setAmenities] = useState('Điều hòa, Nóng lạnh, Tủ lạnh, Giường đệm');
+  const [photos, setPhotos] = useState<(string | File)[]>([]);
+  const [photoError, setPhotoError] = useState('');
+  const [saveStatus, setSaveStatus] = useState('');
+  const saveInProgress = useRef(false);
+  const draftRoomId = useRef('');
+  const canUpload = isSupabaseConnected && roomPhotoUploadConfigured;
 
   const openAddModal = () => {
     setEditingRoom(null);
+    draftRoomId.current = `room_${crypto.randomUUID?.() ?? Date.now()}`;
+    setPhotos([]);
+    setPhotoError('');
     setRoomNumber(`P${rooms.length + 1}01`);
     setFloor(1);
     setAreaM2(25);
@@ -37,6 +58,8 @@ export const LandlordRooms: React.FC = () => {
 
   const openEditModal = (r: Room) => {
     setEditingRoom(r);
+    setPhotos(getRoomPhotoUrls(r.imageUrls));
+    setPhotoError('');
     setRoomNumber(r.roomNumber);
     setFloor(r.floor);
     setAreaM2(r.areaM2);
@@ -45,32 +68,72 @@ export const LandlordRooms: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    const amenitiesArr = amenities.split(',').map((s) => s.trim()).filter(Boolean);
-
-    if (editingRoom) {
-      updateRoom(editingRoom.id, {
-        roomNumber,
-        floor: Number(floor),
-        areaM2: Number(areaM2),
-        basePrice: Number(basePrice),
-        amenities: amenitiesArr,
-      });
-    } else {
-      addRoom({
-        roomNumber,
-        floor: Number(floor),
-        areaM2: Number(areaM2),
-        basePrice: Number(basePrice),
-        amenities: amenitiesArr,
-        status: 'available',
-        electricityMeterStart: 3000,
-        waterMeterStart: 150,
-      });
+  const handlePhotoSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from<File>(e.currentTarget.files ?? []);
+    e.currentTarget.value = '';
+    setPhotoError('');
+    if (photos.length + files.length > maxRoomPhotos) {
+      setPhotoError(`Mỗi phòng có tối đa ${maxRoomPhotos} ảnh.`);
+      return;
     }
+    if (files.some((file) => !roomPhotoTypes.includes(file.type) || file.size === 0 || file.size > maxRoomPhotoBytes)) {
+      setPhotoError('Chọn ảnh JPG, PNG hoặc WebP tối đa 8 MB mỗi ảnh.');
+      return;
+    }
+    setPhotos((current) => [...current, ...files]);
+  };
 
-    setIsModalOpen(false);
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (saveInProgress.current) return;
+    saveInProgress.current = true;
+    setPhotoError('');
+    setSaveStatus('Đang lưu phòng…');
+    try {
+      const imageUrls: string[] = [];
+      for (const [index, photo] of photos.entries()) {
+        if (typeof photo === 'string') {
+          imageUrls.push(photo);
+          continue;
+        }
+        setSaveStatus(`Đang tải ảnh ${index + 1}/${photos.length}…`);
+        let url: string;
+        try {
+          url = await uploadRoomPhoto(photo);
+        } catch {
+          throw new Error(`Không tải được ảnh ${index + 1}. Hãy thử lưu lại hoặc gỡ ảnh này.`);
+        }
+        imageUrls.push(url);
+        setPhotos((current) => current.map((item, itemIndex) => itemIndex === index ? url : item));
+      }
+      setSaveStatus('Đang lưu phòng…');
+      const details = {
+        roomNumber,
+        floor: Number(floor),
+        areaM2: Number(areaM2),
+        basePrice: Number(basePrice),
+        amenities: amenities.split(',').map((item) => item.trim()).filter(Boolean),
+      };
+      const saved = editingRoom
+        ? await updateRoom(editingRoom.id, {
+            ...details,
+            ...(imageUrls.length || editingRoom.imageUrls?.length ? { imageUrls } : {}),
+          })
+        : await addRoom({
+            ...details,
+            ...(imageUrls.length ? { imageUrls } : {}),
+            status: 'available',
+            electricityMeterStart: 3000,
+            waterMeterStart: 150,
+          }, draftRoomId.current);
+      if (!saved) throw new Error('Chưa lưu được phòng vào Supabase. Hãy thử lại.');
+      setIsModalOpen(false);
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : 'Chưa lưu được phòng. Hãy thử lại.');
+    } finally {
+      saveInProgress.current = false;
+      setSaveStatus('');
+    }
   };
 
   return (
@@ -225,12 +288,15 @@ export const LandlordRooms: React.FC = () => {
       {/* Add / Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-lg bg-white rounded-2xl p-6 shadow-2xl border border-slate-200 space-y-5">
+          <div role="dialog" aria-modal="true" aria-labelledby="room-form-title" className="relative max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto bg-white rounded-2xl p-6 shadow-2xl border border-slate-200 space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900 text-base">
+              <h3 id="room-form-title" className="font-bold text-slate-900 text-base">
                 {editingRoom ? `Chỉnh Sửa ${editingRoom.roomNumber}` : 'Thêm Phòng Trọ Mới'}
               </h3>
               <button
+                type="button"
+                aria-label="Đóng biểu mẫu phòng"
+                disabled={Boolean(saveStatus)}
                 onClick={() => setIsModalOpen(false)}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
               >
@@ -239,6 +305,7 @@ export const LandlordRooms: React.FC = () => {
             </div>
 
             <form onSubmit={handleSave} className="space-y-4 text-xs">
+              <fieldset disabled={Boolean(saveStatus)} className="min-w-0 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-slate-700 font-semibold">Tên / Số phòng:</label>
@@ -299,9 +366,54 @@ export const LandlordRooms: React.FC = () => {
                 />
               </div>
 
+              <div className="space-y-2">
+                <label htmlFor="room-photos" className="block font-semibold text-slate-700">Ảnh phòng</label>
+                <p id="room-photo-help" className="text-slate-600">
+                  {canUpload
+                    ? `Tối đa ${maxRoomPhotos} ảnh JPG, PNG hoặc WebP, 8 MB mỗi ảnh. Ảnh đầu tiên là ảnh bìa công khai khi phòng trống.`
+                    : 'Cần cấu hình Cloudinary và Supabase để tải ảnh.'}
+                </p>
+                <input
+                  id="room-photos"
+                  type="file"
+                  multiple
+                  accept={roomPhotoTypes.join(',')}
+                  disabled={!canUpload || photos.length >= maxRoomPhotos}
+                  aria-describedby="room-photo-help"
+                  onChange={handlePhotoSelection}
+                  className="block w-full rounded-xl border border-slate-200 p-2 text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-50 file:px-3 file:py-2 file:font-semibold file:text-teal-800 disabled:opacity-60"
+                />
+                {photos.length > 0 && (
+                  <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {photos.map((photo, index) => (
+                      <li key={index} className="relative aspect-square overflow-hidden rounded-lg bg-slate-100">
+                        {typeof photo === 'string'
+                          ? <img src={photo} alt={`Ảnh ${index + 1}`} className="size-full object-cover" />
+                          : <LocalPhotoPreview file={photo} position={index + 1} />}
+                        <button
+                          type="button"
+                          aria-label={`Gỡ ảnh ${index + 1}`}
+                          onClick={() => {
+                            setPhotos((current) => current.filter((_, itemIndex) => itemIndex !== index));
+                            setPhotoError('');
+                          }}
+                          className="absolute right-0 top-0 grid size-11 place-items-center rounded-bl-lg bg-slate-950/75 text-white hover:bg-slate-950"
+                        >
+                          <X size={16} aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              </fieldset>
+
+              {photoError && <p role="alert" className="text-sm text-rose-700">{photoError}</p>}
+              {saveStatus && <p role="status" className="text-sm text-slate-700">{saveStatus}</p>}
               <div className="pt-3 flex gap-2">
                 <button
                   type="button"
+                  disabled={Boolean(saveStatus)}
                   onClick={() => setIsModalOpen(false)}
                   className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
                 >
@@ -309,7 +421,8 @@ export const LandlordRooms: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-2xs transition-all"
+                  disabled={Boolean(saveStatus)}
+                  className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-2xs transition-all disabled:opacity-50"
                 >
                   {editingRoom ? 'Lưu thay đổi' : 'Tạo phòng'}
                 </button>

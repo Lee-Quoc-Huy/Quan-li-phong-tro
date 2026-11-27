@@ -39,7 +39,12 @@ export interface Room {
   electricityMeterStart: number;
   waterMeterStart: number;
   description?: string;
+  imageUrls?: string[];
 }
+
+export type PublicRoomListing = Pick<Room, 'id' | 'roomNumber' | 'areaM2' | 'basePrice' | 'imageUrls'> & {
+  houseName?: string;
+};
 
 export interface Contract {
   id: string;

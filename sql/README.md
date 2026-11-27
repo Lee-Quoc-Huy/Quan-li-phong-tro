@@ -28,3 +28,8 @@ Thư mục này chứa toàn bộ mã nguồn cơ sở dữ liệu SQL theo đú
 2. Vào mục **SQL Editor** ở thanh menu bên trái.
 3. Mở file `supabase_schema.sql`, sao chép toàn bộ nội dung và dán vào SQL Editor.
 4. Nhấn **Run** để khởi tạo toàn bộ CSDL.
+## Ảnh phòng trọ
+
+Với cơ sở dữ liệu đã tạo, chạy [room_photo_urls.sql](room_photo_urls.sql) để thêm cột `phong.chi_tiet`. Ứng dụng lưu danh sách URL trong `chi_tiet.imageUrls` theo mã phòng và mã chủ trọ. Tệp ảnh nằm trên Cloudinary.
+
+Đặt `VITE_CLOUDINARY_CLOUD_NAME` và `VITE_CLOUDINARY_ROOM_UPLOAD_PRESET` trong môi trường build cùng với hai biến Supabase hiện có. Dùng một upload preset unsigned dành riêng cho ảnh phòng, giới hạn định dạng JPG, PNG và WebP và bật `disallow_public_id`. [Tài liệu Cloudinary](https://cloudinary.com/documentation/upload_presets)

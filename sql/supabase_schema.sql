@@ -93,8 +93,11 @@ CREATE TABLE IF NOT EXISTS phong (
     mo_ta TEXT,
     trang_thai VARCHAR(30) DEFAULT 'available',
     chi_so_dien_dau NUMERIC(10,2) DEFAULT 0,
-    chi_so_nuoc_dau NUMERIC(10,2) DEFAULT 0
+    chi_so_nuoc_dau NUMERIC(10,2) DEFAULT 0,
+    chi_tiet JSONB
 );
+
+ALTER TABLE phong ADD COLUMN IF NOT EXISTS chi_tiet JSONB;
 
 -- ==============================================================================
 -- 6. BẢNG THIẾT_BỊ (Equipment / Room Amenities)

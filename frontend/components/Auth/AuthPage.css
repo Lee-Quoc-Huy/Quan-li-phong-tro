@@ -1,0 +1,29 @@
+.public-view {
+  transition: transform 280ms ease, opacity 220ms ease, visibility 0s;
+}
+
+.public-view--feed {
+  --slide-away: -65%;
+  transform-origin: top left;
+}
+
+.public-view--account {
+  --slide-away: 65%;
+  transform-origin: top right;
+}
+
+.public-view[data-inactive="true"] {
+  position: absolute;
+  inset: 0 0 auto;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(var(--slide-away), -1.5rem) scale(0.55);
+  transition-delay: 0s, 0s, 280ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-view,
+  .public-view[data-inactive="true"] {
+    transition: none;
+  }
+}
