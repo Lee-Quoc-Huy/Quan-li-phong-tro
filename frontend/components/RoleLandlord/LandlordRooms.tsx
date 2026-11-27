@@ -33,9 +33,9 @@ export const LandlordRooms: React.FC = () => {
   // Form State
   const [roomNumber, setRoomNumber] = useState('');
   const [floor, setFloor] = useState(1);
-  const [areaM2, setAreaM2] = useState(25);
-  const [basePrice, setBasePrice] = useState(3500000);
-  const [amenities, setAmenities] = useState('Điều hòa, Nóng lạnh, Tủ lạnh, Giường đệm');
+  const [areaM2, setAreaM2] = useState<number | ''>('');
+  const [basePrice, setBasePrice] = useState<number | ''>('');
+  const [amenities, setAmenities] = useState('');
   const [photos, setPhotos] = useState<(string | File)[]>([]);
   const [photoError, setPhotoError] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
@@ -48,11 +48,11 @@ export const LandlordRooms: React.FC = () => {
     draftRoomId.current = `room_${crypto.randomUUID?.() ?? Date.now()}`;
     setPhotos([]);
     setPhotoError('');
-    setRoomNumber(`P${rooms.length + 1}01`);
+    setRoomNumber('');
     setFloor(1);
-    setAreaM2(25);
-    setBasePrice(3500000);
-    setAmenities('Điều hòa Inverter, Nóng lạnh, Tủ lạnh, Giường đệm');
+    setAreaM2('');
+    setBasePrice('');
+    setAmenities('');
     setIsModalOpen(true);
   };
 
@@ -123,8 +123,8 @@ export const LandlordRooms: React.FC = () => {
             ...details,
             ...(imageUrls.length ? { imageUrls } : {}),
             status: 'available',
-            electricityMeterStart: 3000,
-            waterMeterStart: 150,
+            electricityMeterStart: 0,
+            waterMeterStart: 0,
           }, draftRoomId.current);
       if (!saved) throw new Error('Chưa lưu được phòng vào Supabase. Hãy thử lại.');
       setIsModalOpen(false);
@@ -338,7 +338,7 @@ export const LandlordRooms: React.FC = () => {
                     required
                     min={10}
                     value={areaM2}
-                    onChange={(e) => setAreaM2(Number(e.target.value))}
+                    onChange={(e) => setAreaM2(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 outline-none focus:border-teal-500 focus:bg-white"
                   />
                 </div>
@@ -349,7 +349,7 @@ export const LandlordRooms: React.FC = () => {
                     required
                     step={100000}
                     value={basePrice}
-                    onChange={(e) => setBasePrice(Number(e.target.value))}
+                    onChange={(e) => setBasePrice(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 outline-none focus:border-teal-500 focus:bg-white font-mono"
                   />
                 </div>

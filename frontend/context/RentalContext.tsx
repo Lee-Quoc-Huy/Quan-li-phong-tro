@@ -69,7 +69,6 @@ interface RentalContextType {
   isAuthenticated: boolean;
   isSupabaseConnected: boolean;
   login: (identifier: string, password?: string, role?: UserRole) => Promise<{ success: boolean; message: string; user?: User; fromSupabase?: boolean }>;
-  loginAsDemoUser: (userId: string) => void;
   registerUser: (userData: {
     name: string;
     phone: string;
@@ -194,7 +193,7 @@ interface RentalContextType {
   changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
   resetPasswordByEmailAndCccd: (email: string, cccd: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
   
-  // Reset demo data
+  // Reset application data
   resetAllData: () => void;
 }
 
@@ -214,7 +213,7 @@ const DEFAULT_EMPTY_USER: User = {
 const RentalContext = createContext<RentalContextType | undefined>(undefined);
 
 export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Load state from localStorage or initialize from mock
+  // Load saved state or initialize defaults
   const [users, setUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_users`);
     return saved ? JSON.parse(saved) : INITIAL_USERS;
@@ -980,10 +979,6 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       user: found,
       fromSupabase: false,
     };
-  };
-
-  const loginAsDemoUser = () => {
-    console.warn('Đăng nhập demo đã bị vô hiệu hóa vì lý do bảo mật. Vui lòng đăng nhập bằng mật khẩu.');
   };
 
   const registerUser = async (userData: {
@@ -1923,9 +1918,9 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       ...telemetry,
       [newRoomId]: {
         roomId: newRoomId,
-        currentKwh: roomData.electricityMeterStart || 100,
-        currentWaterM3: roomData.waterMeterStart || 5,
-        voltage: 221.0,
+        currentKwh: roomData.electricityMeterStart ?? 0,
+        currentWaterM3: roomData.waterMeterStart ?? 0,
+        voltage: 0,
         currentAmps: 0,
         powerWatts: 0,
         waterFlowRateLpm: 0,
@@ -2509,7 +2504,7 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       title: data.title,
       description: data.description,
       urgency: data.urgency,
-      photos: data.photos || ['https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&auto=format&fit=crop&q=80'],
+      photos: data.photos ?? [],
       status: 'pending',
       createdAt: new Date().toLocaleString('vi-VN'),
     };
@@ -3232,7 +3227,6 @@ export const RentalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         isAuthenticated,
         isSupabaseConnected: isSupabaseConfigured(),
         login,
-        loginAsDemoUser,
         registerUser,
         logout,
         currentUser,

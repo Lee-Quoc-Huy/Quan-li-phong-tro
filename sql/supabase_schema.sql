@@ -364,11 +364,3 @@ INSERT INTO profiles (
     email = EXCLUDED.email,
     password_hash = EXCLUDED.password_hash,
     id_card = EXCLUDED.id_card;
-
--- Dữ liệu mẫu dịch vụ ban đầu
-INSERT INTO dich_vu (ma_dv, ten_dv, don_gia, ghi_chu) VALUES
-('dv_dien', 'Điện sinh hoạt', 3500, 'Tính theo kWh đồng hồ'),
-('dv_nuoc', 'Nước sinh hoạt', 25000, 'Tính theo m3 đồng hồ'),
-('dv_rac', 'Thu gom rác', 40000, 'Cố định hàng tháng/phòng'),
-('dv_wifi', 'Internet Wifi tốc độ cao', 80000, 'Cố định hàng tháng/phòng')
-ON CONFLICT (ma_dv) DO NOTHING;

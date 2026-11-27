@@ -2,20 +2,11 @@ import { useState } from 'react';
 import { Building2, ChevronLeft, ChevronRight, Image, Ruler, Search, SlidersHorizontal } from 'lucide-react';
 import type { PublicRoomListing } from '../../types';
 
-const demoRoom: PublicRoomListing = {
-  id: 'demo',
-  roomNumber: 'Phòng studio',
-  houseName: 'Dãy trọ mẫu',
-  areaM2: 22,
-  basePrice: 2800000,
-};
-
 const formatPrice = new Intl.NumberFormat('vi-VN', {
   style: 'currency',
   currency: 'VND',
 });
 const formatArea = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
-const illustrationUrl = `${import.meta.env.BASE_URL}assets/phong-tro-minh-hoa.webp`;
 const priceBands = [
   { label: 'Mọi mức giá', min: 0, max: Infinity },
   { label: 'Dưới 2 triệu', min: 0, max: 2_000_000 },
@@ -58,21 +49,23 @@ function RoomPhotoGallery({ room }: { room: PublicRoomListing }) {
   const urls = room.imageUrls ?? [];
   const index = selectedIndex < urls.length ? selectedIndex : 0;
   const url = urls[index];
-  const isIllustration = !url || failedUrls.includes(url);
+  const hasPhoto = Boolean(url) && !failedUrls.includes(url);
 
   return (
     <div className="relative aspect-[16/10] overflow-hidden bg-emerald-950/10">
-      <img
-        src={isIllustration ? illustrationUrl : url}
-        alt={isIllustration ? '' : `Ảnh ${index + 1} của ${room.roomNumber}`}
-        loading="lazy"
-        onError={isIllustration ? undefined : () => setFailedUrls((previous) => [...previous, url])}
-        className="size-full object-cover"
-      />
-      {isIllustration && (
-        <span className="absolute bottom-2.5 right-2.5 rounded-md bg-slate-950/90 px-2 py-1 text-xs text-white">
-          Ảnh minh họa
-        </span>
+      {hasPhoto ? (
+        <img
+          src={url}
+          alt={`Ảnh ${index + 1} của ${room.roomNumber}`}
+          loading="lazy"
+          onError={() => setFailedUrls((previous) => [...previous, url])}
+          className="size-full object-cover"
+        />
+      ) : (
+        <div className="flex size-full flex-col items-center justify-center gap-2 text-sm text-slate-600">
+          <Image size={22} aria-hidden="true" />
+          {url ? 'Không tải được ảnh' : 'Chưa có ảnh'}
+        </div>
       )}
       {urls.length > 1 && (
         <>
@@ -108,9 +101,7 @@ export function PublicRoomFeed({ listings, isLoading }: { listings: PublicRoomLi
   const filterCount = Number(Boolean(filters.priceBand)) + Number(Boolean(filters.minArea)) + Number(filters.withPhotos);
   const hasFilters = Boolean(filters.query.trim()) || filterCount > 0;
   const waitingForListings = isLoading && listings.length === 0;
-  const isDemo = !isLoading && listings.length === 0 && !hasFilters;
   const matchingRooms = findMatchingRooms(listings, filters, sort);
-  const visibleListings = isDemo ? [demoRoom] : matchingRooms;
   const resetFilters = () => setFilters(defaultFilters);
 
   return (
@@ -200,12 +191,12 @@ export function PublicRoomFeed({ listings, isLoading }: { listings: PublicRoomLi
       {!waitingForListings && matchingRooms.length === 0 && (
         <div className="mb-4 flex items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white/70 p-4 text-sm text-slate-700">
           <Image size={20} className="shrink-0 text-emerald-800" aria-hidden="true" />
-          {hasFilters ? 'Chưa có phòng khớp. Thử đổi từ khóa hoặc mở rộng bộ lọc.' : 'Hiện chưa có phòng trống. Tin mẫu bên dưới để bạn xem thử.'}
+          {hasFilters && listings.length > 0 ? 'Chưa có phòng khớp. Thử đổi từ khóa hoặc mở rộng bộ lọc.' : 'Hiện chưa có phòng trống.'}
         </div>
       )}
 
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {visibleListings.map((room) => (
+        {matchingRooms.map((room) => (
           <li key={room.id} className="min-w-0 overflow-hidden rounded-2xl border border-emerald-950/10 bg-white shadow-sm">
             <RoomPhotoGallery room={room} />
             <div className="p-4">
@@ -213,7 +204,7 @@ export function PublicRoomFeed({ listings, isLoading }: { listings: PublicRoomLi
               <p className="mt-0.5 flex items-center gap-1.5 text-sm text-slate-600 [overflow-wrap:anywhere]">
                 <Building2 size={15} className="shrink-0" aria-hidden="true" />
                 <span className="min-w-0">
-                {isDemo && 'Tin mẫu · '}{room.houseName || 'Dãy trọ'}
+                  {room.houseName || 'Dãy trọ'}
                 </span>
               </p>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-slate-200 pt-3">
